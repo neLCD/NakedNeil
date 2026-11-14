@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">TinyLog</string>
+    <string name="title_activity_main">TinyLog</string>
+    <string name="package_name">com.tinylog.babytracker</string>
+    <string name="custom_url_scheme">com.tinylog.babytracker</string>
+</resources>

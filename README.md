@@ -1,5 +1,7 @@
 # Ping! Messenger
 
+> This repository also contains **TinyLog**, a baby tracker for Android, in [`baby-tracker/`](baby-tracker).
+
 A nostalgic, early-2000s style instant messenger that actually works: real accounts,
 real-time chat, presence, nudges, emoticons, and a tiny desktop with draggable windows
 and a taskbar. All artwork, names and sounds are original.

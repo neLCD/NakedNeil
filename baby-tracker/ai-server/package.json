@@ -1,0 +1,15 @@
+{
+  "name": "tinylog-ai-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Small backend that keeps the Anthropic API key off the phone and answers TinyLog's AI questions.",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.8.0"
+  }
+}

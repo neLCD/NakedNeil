@@ -1,0 +1,6 @@
+{
+  "appId": "com.tinylog.babytracker",
+  "appName": "TinyLog",
+  "webDir": "www",
+  "android": { "backgroundColor": "#fff7f2" }
+}

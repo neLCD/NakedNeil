@@ -1,0 +1,69 @@
+name: Build TinyLog (Android)
+
+on:
+  push:
+    paths:
+      - 'baby-tracker/**'
+      - '.github/workflows/android.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      HAS_KEYSTORE: ${{ secrets.TINYLOG_KEYSTORE_BASE64 != '' }}
+    defaults:
+      run:
+        working-directory: baby-tracker
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: baby-tracker/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install and test
+        run: |
+          npm ci
+          npm test
+          cd ai-server && npm ci && npm test
+
+      - name: Copy the web app into the Android project
+        run: npx cap sync android
+
+      - name: Build installable debug APK
+        working-directory: baby-tracker/android
+        run: ./gradlew --no-daemon assembleDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TinyLog-debug-apk
+          path: baby-tracker/android/app/build/outputs/apk/debug/app-debug.apk
+
+      # Play Store bundle: only when the signing secrets have been added to the repository.
+      - name: Build signed release bundle (.aab)
+        if: env.HAS_KEYSTORE == 'true'
+        working-directory: baby-tracker/android
+        env:
+          TINYLOG_KEYSTORE_PASSWORD: ${{ secrets.TINYLOG_KEYSTORE_PASSWORD }}
+          TINYLOG_KEY_ALIAS: ${{ secrets.TINYLOG_KEY_ALIAS }}
+          TINYLOG_KEY_PASSWORD: ${{ secrets.TINYLOG_KEY_PASSWORD }}
+        run: |
+          echo "${{ secrets.TINYLOG_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/tinylog.keystore"
+          TINYLOG_KEYSTORE_FILE="$RUNNER_TEMP/tinylog.keystore" ./gradlew --no-daemon bundleRelease
+
+      - uses: actions/upload-artifact@v4
+        if: env.HAS_KEYSTORE == 'true'
+        with:
+          name: TinyLog-release-aab
+          path: baby-tracker/android/app/build/outputs/bundle/release/app-release.aab
