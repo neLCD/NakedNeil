@@ -11,12 +11,12 @@ keep a gear wishlist, and get suggestions, both built-in and from AI.
 
 | Tab | Details |
 |---|---|
-| **Today** | One-tap Pee, Poop and Spit-up; Feed (breastfeeding timer with left/right and pause, or enter minutes; bottle amount; solids), pre-filled from the last feed; Sleep with start/stop or past entry; time since last feed and diaper; daily totals; tap any entry to edit; delete with undo; browse previous days |
-| **Trends** | Daily averages over 7, 14 or 30 days (the numbers a doctor asks for); bar charts for sleep (with the typical range for the age), milk feeds, and wet/dirty diapers; a 24-hour day-pattern strip showing when sleep and feeds happen; weight and height with a chart each |
-| **Play** | Activity ideas for the baby's age (30 ideas across six age bands): what to do, what it supports, how long; mark as done to keep count |
-| **Firsts** | First words with the age they were said; first foods with reaction and possible-allergy flag (logging a solid feed adds new foods automatically); starter-food ideas by age with safe preparation, allergen labels, and what to wait on |
-| **More** | Built-in tips from your own logs (work offline) and **Ask the AI** when an AI service is set; Gear wishlist with category, price, shop link and priority, plus ideas by age |
-| **Settings** | Metric or imperial, currency, backup to a file and restore, delete everything |
+| **Today** | One-tap Pee, Poop and Spit-up; Feed (breastfeeding timer with left/right and pause, or enter minutes; bottle amount; solids), pre-filled from the last feed; Sleep with start/stop or past entry, and "Start sleep with white noise" to start both at once; time since last feed and diaper; daily totals; tap any entry to edit; delete with undo; browse previous days |
+| **Sounds** | White, pink or brown noise for settling, with a timer (15 min, 30 min, 1 hour, or no timer) and volume. On the phone it keeps playing with the screen off (a notification has a Stop button) and can be cast to a Chromecast or Google Nest speaker on the same Wi-Fi; Bluetooth speakers work with no setup. Also reached from the Sleep sheet and from the "Sleep started" message; while a sound plays, a slim strip with Stop sits at the top of every other tab |
+| **Trends** | **Daily**: averages over 7, 14 or 30 days (the numbers a doctor asks for); bar charts for sleep (with the typical range for the age), milk feeds, and wet/dirty diapers; a 24-hour day-pattern strip showing when sleep and feeds happen. **Growth**: weight and height with a chart each |
+| **Firsts** | What you record. **Words**: first words with the age they were said. **Foods**: first foods with reaction and possible-allergy flag (logging a solid feed adds new foods automatically) |
+| **Ideas** | What the app suggests. **Play**: activity ideas for the baby's age (30 ideas across six age bands): what to do, what it supports, how long; mark as done to keep count. **Food**: starter-food ideas by age with safe preparation, allergen labels, and what to wait on; "Tried it" adds the food to Firsts. **Tips**: built-in tips from your own logs (work offline) and **Ask the AI** when an AI service is set. **Gear**: wishlist with category, price, shop link and priority, plus ideas by age |
+| **Settings** (top-right icon) | Metric or imperial, currency, AI service address, backup to a file and restore, delete everything |
 
 All data stays on the phone. Nothing is sent anywhere unless you ask the AI a question,
 and then only a short summary of the logs is sent.
@@ -78,6 +78,18 @@ summaries to your server), screenshots, and the 512 px icon in `store/`. The app
 `android/app/build.gradle` before the first upload if you want your own, because it cannot
 be changed afterwards.
 
+## White noise and casting, technically
+
+The sound is generated on the phone, not streamed from the internet. `android/.../noise/NoiseService`
+is a foreground service (type `mediaPlayback`), so Android keeps it alive with the screen off. For
+casting, the same service serves an endless WAV stream on the home Wi-Fi and the Google Cast SDK
+tells the speaker to play it through the standard media receiver, so no hosting or Cast developer
+registration is needed. When the timer ends or the speaker disconnects, the sound stops; it never
+falls back to the phone's own speaker by surprise.
+
+Before publishing: declare the foreground service (media playback) in the Play Console, and test
+background playback and casting on real devices. Neither can be exercised by the automated tests.
+
 ## A note on health information
 
 TinyLog gives general information, not medical advice. The built-in tips and food ideas
@@ -88,14 +100,33 @@ the countries you publish in.
 ## Layout
 
 ```
-www/            the app: HTML, CSS and JavaScript modules, no build step
+www/                the app: HTML, CSS and JavaScript modules, no build step
+  index.html        the page: header, now-playing strip, screen area, tab bar
+  css/style.css     all styles, in sections that follow the modules below
+  js/app.js         the shell: header, bottom tabs, render loop
+  js/ui.js          shared building blocks: the h() DOM helper, toast, bottom sheet, segments, fields
+  js/store.js       saved data (load, clean up, save) and where the parent is in the app
+  js/forms.js       the add/edit form sheet, shared inputs, delete with undo
+  js/screens/
+    today.js        Today: quick-log buttons, breastfeeding timer card, totals, timeline, welcome
+    events.js       the feed, sleep, diaper and spit-up sheets; starting a sleep or the timer
+    trends.js       Trends > Daily: averages, bar charts, day pattern
+    growth.js       Trends > Growth: weight and height
+    firsts.js       Firsts: first words and first foods
+    ideas.js        Ideas: the Play / Food / Tips / Gear switch
+    play.js         Ideas > Play
+    food-ideas.js   Ideas > Food
+    tips.js         Ideas > Tips, and Ask the AI
+    gear.js         Ideas > Gear
+    settings.js     Settings and backup (bottom sheet)
+  js/sounds.js      Sounds: the screen and the now-playing strip
+  js/logic.js       units, ages, daily summaries, built-in tips, AI summary (no DOM; unit-tested)
+  js/chart.js       line, bar and day-pattern charts
+  js/content.js     food ideas and gear ideas
   js/activities.js  play ideas by age
-  js/icons.js     line icons
-  js/logic.js     units, ages, daily summaries, built-in tips, AI summary
-  js/content.js   food ideas and gear ideas
-  js/chart.js     line, bar and day-pattern charts
-  js/app.js       screens and forms
-android/        Android project generated by Capacitor
-ai-server/      backend for AI suggestions
-test/           tests for logic.js
+  js/icons.js       line icons
+  js/config.js      default AI service address
+android/            Android project generated by Capacitor
+ai-server/          backend for AI suggestions
+test/               tests for logic.js
 ```

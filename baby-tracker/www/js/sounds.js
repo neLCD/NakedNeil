@@ -11,7 +11,7 @@ const TYPES = [
   ['pink', 'Pink', 'Softer and deeper, like steady rain.'],
   ['brown', 'Brown', 'A low rumble, like a waterfall far away or the sound of the womb.'],
 ];
-const DURATIONS = [[15, '15 min'], [30, '30 min'], [60, '1 hour'], [0, 'Until I stop']];
+const DURATIONS = [[15, '15 min'], [30, '30 min'], [60, '1 hour'], [0, 'No timer']];
 const PREF_KEY = 'tinylog.sound';
 const FADE_MS = 8000;
 

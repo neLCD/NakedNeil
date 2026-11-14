@@ -270,7 +270,7 @@ export function buildTips(state, now = Date.now()) {
     if (months < 5.5) {
       tips.push({ icon: '🍼', title: 'Milk is the whole menu for now', text: 'Until around 6 months, breast milk or formula gives babies everything they need. Solids usually start at about 6 months.' });
     } else if (state.foods.length === 0 && months < 9) {
-      tips.push({ icon: '🥑', title: 'Ready for first foods?', text: `Most babies start solids at around 6 months. Signs of readiness: sitting with support, steady head control, and reaching for your food. See Food ideas under Firsts for gentle starters.` });
+      tips.push({ icon: '🥑', title: 'Ready for first foods?', text: `Most babies start solids at around 6 months. Signs of readiness: sitting with support, steady head control, and reaching for your food. See Food under Ideas for gentle starters.` });
     } else {
       const next = untriedFoods(state, months).slice(0, 3).map((f) => f.name);
       if (next.length) tips.push({ icon: '🥕', title: 'Foods to try next', text: `${name} has not tried ${next.join(', ')} yet. Offer one new food at a time so any reaction is easy to spot.` });
