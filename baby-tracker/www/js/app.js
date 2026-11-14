@@ -31,6 +31,7 @@ const blank = () => ({
   baby: { name: '', birthDate: '' },
   settings: { units: 'metric', currency: '$', aiUrl: '' },
   events: [], growth: [], words: [], foods: [], gear: [],
+  nursing: null, // breastfeeding timer in progress, see logic.js
 });
 function normalise(data) {
   const b = blank();
@@ -43,6 +44,7 @@ function normalise(data) {
     words: Array.isArray(data.words) ? data.words.filter((w) => w && w.id && w.word) : [],
     foods: Array.isArray(data.foods) ? data.foods.filter((f) => f && f.id && f.name) : [],
     gear: Array.isArray(data.gear) ? data.gear.filter((g) => g && g.id && g.name) : [],
+    nursing: data.nursing && Number.isFinite(data.nursing.start) ? data.nursing : null,
   };
 }
 function load() { try { return normalise(JSON.parse(localStorage.getItem(KEY))); } catch { return blank(); } }
@@ -122,6 +124,12 @@ function feedSheet(existing, preset) {
   if (draft.amountMl) draft.amount = L.volumeFromMl(draft.amountMl, units());
   formSheet(existing ? 'Edit feed' : 'Log a feed', draft, (d, redraw) => [
     seg([['breast', '🤱 Breast'], ['bottle', '🍼 Bottle'], ['solid', '🥣 Solid']], d.method, (v) => { d.method = v; redraw(); }),
+    d.method === 'breast' && !existing && [
+      h('div', { class: 'row2' },
+        h('button', { class: 'btn primary', type: 'button', onclick: () => startNursing('left') }, '▶ Start left'),
+        h('button', { class: 'btn primary', type: 'button', onclick: () => startNursing('right') }, '▶ Start right')),
+      h('p', { class: 'divider' }, state.nursing ? 'A timer is already running. Starting again replaces it.' : 'or enter a feed that already happened'),
+    ],
     d.method === 'breast' && [
       field('Side', seg([['left', 'Left'], ['right', 'Right'], ['both', 'Both']], d.side, (v) => { d.side = v; redraw(); })),
       field('Minutes', h('input', { type: 'number', inputMode: 'numeric', min: 0, max: 180, value: d.minutes ?? '', oninput: (e) => { d.minutes = e.target.value; } })),
@@ -140,7 +148,11 @@ function feedSheet(existing, preset) {
   ], (d) => {
     if (!d.start) return 'Please set a time.';
     const ev = { id: d.id, type: 'feed', method: d.method, start: d.start, note: (d.note || '').trim() };
-    if (d.method === 'breast') { ev.side = d.side; ev.minutes = Math.round(num(d.minutes) ?? 0) || undefined; }
+    if (d.method === 'breast') {
+      ev.side = d.side; ev.minutes = Math.round(num(d.minutes) ?? 0) || undefined;
+      // keep the timer's left/right split unless the entry was changed
+      if (existing && existing.leftMin != null && ev.side === 'both' && ev.minutes === existing.minutes) { ev.leftMin = existing.leftMin; ev.rightMin = existing.rightMin; }
+    }
     if (d.method === 'bottle') { const a = num(d.amount); ev.amountMl = a ? L.volumeToMl(a, units()) : undefined; ev.content = d.content; }
     if (d.method === 'solid') {
       ev.food = (d.food || '').trim();
@@ -204,6 +216,42 @@ function spitupSheet(existing) {
     upsertEvent({ id: d.id, type: 'spitup', amount: d.amount, start: d.start, note: (d.note || '').trim() });
   }, () => deleteEvent(existing.id));
 }
+// ---------- breastfeeding timer ----------
+function startNursing(side) {
+  const now = Date.now();
+  state.nursing = { start: now, side, sideStart: now, leftMs: 0, rightMs: 0 };
+  ui.tab = 'home'; ui.day = L.dayStart(now);
+  closeSheet(); save();
+}
+function nursingCard() {
+  const n = state.nursing;
+  if (!n) return null;
+  const running = n.sideStart != null;
+  const sideBtn = (side, label) => h('button', {
+    type: 'button', class: 'side' + (running && n.side === side ? ' on' : ''), 'data-side': side,
+    'aria-pressed': String(running && n.side === side),
+    onclick: () => { state.nursing = L.nursingTap(state.nursing, side); save(); },
+  }, h('b', null, label), h('span', { class: 'side-time' }, ''), h('small', null, running && n.side === side ? 'Tap to pause' : running ? 'Tap to switch' : 'Tap to resume'));
+  return h('section', { class: 'card nurse', 'aria-label': 'Breastfeeding timer' },
+    h('div', { class: 'nurse-head' }, h('span', null, running ? '🤱 Feeding now' : '🤱 Paused'), h('b', { id: 'nurse-clock', role: 'timer' }, '')),
+    h('div', { class: 'row2' }, sideBtn('left', 'Left'), sideBtn('right', 'Right')),
+    h('div', { class: 'actions' },
+      h('button', { class: 'btn danger', type: 'button', onclick: () => { if (confirm('Discard this feed without logging it?')) { state.nursing = null; save(); } } }, 'Discard'),
+      h('button', { class: 'btn primary', type: 'button', onclick: () => {
+        const ev = L.nursingToFeed(state.nursing);
+        state.nursing = null; state.events.push(ev); ui.day = L.dayStart(ev.start); save();
+        toast(`Breastfeed logged: ${L.describeEvent(ev, units()).detail}`, 'Edit', () => editEvent(ev));
+      } }, '■ Stop and log')));
+}
+function tickNursing() {
+  const clock = $('nurse-clock');
+  if (!clock || !state.nursing) return;
+  const t = L.nursingElapsed(state.nursing);
+  clock.textContent = L.fmtClock(t.totalMs);
+  for (const el of document.querySelectorAll('.nurse .side')) el.querySelector('.side-time').textContent = L.fmtClock(el.dataset.side === 'left' ? t.leftMs : t.rightMs);
+}
+setInterval(tickNursing, 1000);
+
 const editEvent = (e) => ({ feed: feedSheet, sleep: sleepSheet, diaper: diaperSheet, spitup: spitupSheet }[e.type](e));
 
 function quickLog(ev, label) {
@@ -230,6 +278,7 @@ function viewHome() {
   const milk = [s.bottleMl ? L.fmtVolume(s.bottleMl, units()) : '', s.breastMin ? `${s.breastMin} min` : ''].filter(Boolean).join(' + ');
 
   return [
+    nursingCard(),
     h('section', { class: 'since' },
       h('div', { class: 'chip' }, h('span', null, '🍼 Last feed'), h('b', null, since(lastFeed))),
       h('div', { class: 'chip' + (sleeping ? ' on' : '') }, h('span', null, sleeping ? '😴 Asleep for' : '☀️ Awake for'),
@@ -554,6 +603,7 @@ function render() {
   scroller.replaceChildren(...clean([view()]));
   scroller.dataset.tab = ui.tab;
   scroller.scrollTop = keep;
+  tickNursing();
   $('tabs').replaceChildren(...TABS.map(([id, icon, label]) => h('button', {
     type: 'button', 'aria-current': id === ui.tab ? 'page' : null, onclick: () => { ui.tab = id; render(); },
   }, h('i', null, icon), label)));

@@ -119,12 +119,41 @@ export function lastEvent(events, pred) {
 }
 export const currentSleep = (events) => events.find((e) => e.type === 'sleep' && e.end == null) || null;
 
+// ---------- breastfeeding timer ----------
+// A session is { start, side, sideStart, leftMs, rightMs }. `sideStart` is null while paused.
+export function nursingElapsed(n, now = Date.now()) {
+  const running = n.sideStart != null ? Math.max(0, now - n.sideStart) : 0;
+  const leftMs = (n.leftMs || 0) + (n.side === 'left' ? running : 0);
+  const rightMs = (n.rightMs || 0) + (n.side === 'right' ? running : 0);
+  return { leftMs, rightMs, totalMs: leftMs + rightMs };
+}
+/** Tap a side: the running side pauses, any other tap (re)starts on that side. */
+export function nursingTap(n, side, now = Date.now()) {
+  const { leftMs, rightMs } = nursingElapsed(n, now);
+  const pause = n.sideStart != null && n.side === side;
+  return { ...n, leftMs, rightMs, side, sideStart: pause ? null : now };
+}
+/** Turn a finished session into a feed event. */
+export function nursingToFeed(n, now = Date.now()) {
+  const { leftMs, rightMs, totalMs } = nursingElapsed(n, now);
+  const mins = (ms) => Math.round(ms / 60000);
+  const side = leftMs && rightMs ? 'both' : rightMs ? 'right' : 'left';
+  const ev = { id: uid(), type: 'feed', method: 'breast', start: n.start, side, minutes: Math.max(1, mins(totalMs)), note: '' };
+  if (side === 'both') { ev.leftMin = mins(leftMs); ev.rightMin = mins(rightMs); }
+  return ev;
+}
+export function fmtClock(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000)), p = (v) => String(v).padStart(2, '0');
+  return s >= 3600 ? `${Math.floor(s / 3600)}:${p(Math.floor(s / 60) % 60)}:${p(s % 60)}` : `${p(Math.floor(s / 60))}:${p(s % 60)}`;
+}
+
 export function describeEvent(e, units) {
   if (e.type === 'feed') {
     if (e.method === 'bottle') return { icon: '🍼', title: 'Bottle', detail: [e.amountMl ? fmtVolume(e.amountMl, units) : '', e.content || ''].filter(Boolean).join(' · ') };
     if (e.method === 'solid') return { icon: '🥣', title: 'Solid food', detail: e.food || '' };
     const side = { left: 'Left', right: 'Right', both: 'Both sides' }[e.side] || '';
-    return { icon: '🤱', title: 'Breastfeed', detail: [side, e.minutes ? `${e.minutes} min` : ''].filter(Boolean).join(' · ') };
+    const split = e.side === 'both' && e.leftMin != null && e.rightMin != null ? `L ${e.leftMin} · R ${e.rightMin} min` : '';
+    return { icon: '🤱', title: 'Breastfeed', detail: split || [side, e.minutes ? `${e.minutes} min` : ''].filter(Boolean).join(' · ') };
   }
   if (e.type === 'sleep') return { icon: '😴', title: e.end == null ? 'Sleeping now' : 'Sleep', detail: e.end == null ? '' : fmtDuration(e.end - e.start) };
   if (e.type === 'diaper') {

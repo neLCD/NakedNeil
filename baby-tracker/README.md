@@ -9,7 +9,7 @@ keep a gear wishlist, and get suggestions, both built-in and from AI.
 
 | Area | Details |
 |---|---|
-| **Today** | One-tap Pee, Poop and Spit-up; Feed (breast side + minutes, bottle amount, solids); Sleep with start/stop timer or past entry; "last feed / awake for / last diaper" at a glance; daily totals; tap any entry to edit; browse previous days |
+| **Today** | One-tap Pee, Poop and Spit-up; Feed (breastfeeding timer with left/right and pause, or enter minutes; bottle amount; solids); Sleep with start/stop timer or past entry; "last feed / awake for / last diaper" at a glance; daily totals; tap any entry to edit; browse previous days |
 | **Growth** | Weight and height entries, change since last time, a chart for each |
 | **Firsts** | First words with the age they were said; first foods with reaction and possible-allergy flag (logging a solid feed adds new foods automatically) |
 | **Food ideas** | Starter foods by age with how to prepare them safely, allergen labels, and what to wait on |

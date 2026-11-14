@@ -86,3 +86,23 @@ test('AI summary includes the essentials and no more than 7 days', () => {
   assert.match(text, /Foods tried: Banana \(loved\)/);
   assert.match(text, /Gear wishlist: High chair/);
 });
+
+test('breastfeeding timer: switch sides, pause, and log', () => {
+  const t0 = at(2026, 11, 14, 9, 0), min = 60000;
+  let n = { start: t0, side: 'left', sideStart: t0, leftMs: 0, rightMs: 0 };
+  assert.deepEqual(L.nursingElapsed(n, t0 + 6 * min), { leftMs: 6 * min, rightMs: 0, totalMs: 6 * min });
+  n = L.nursingTap(n, 'right', t0 + 6 * min);          // switch to right
+  n = L.nursingTap(n, 'right', t0 + 10 * min);         // pause after 4 min on the right
+  assert.equal(n.sideStart, null);
+  assert.equal(L.nursingElapsed(n, t0 + 30 * min).totalMs, 10 * min); // paused time is not counted
+  n = L.nursingTap(n, 'left', t0 + 12 * min);          // resume on the left for 3 more
+  const ev = L.nursingToFeed(n, t0 + 15 * min);
+  assert.deepEqual({ ...ev, id: 0 }, { id: 0, type: 'feed', method: 'breast', start: t0, side: 'both', minutes: 13, note: '', leftMin: 9, rightMin: 4 });
+  assert.equal(L.describeEvent(ev, 'metric').detail, 'L 9 · R 4 min');
+
+  const short = L.nursingToFeed({ start: t0, side: 'right', sideStart: t0, leftMs: 0, rightMs: 0 }, t0 + 20000);
+  assert.equal(short.side, 'right');
+  assert.equal(short.minutes, 1); // never logs a 0-minute feed
+  assert.equal(L.fmtClock(65000), '01:05');
+  assert.equal(L.fmtClock(3725000), '1:02:05');
+});

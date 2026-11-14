@@ -148,3 +148,13 @@ form { display: flex; flex-direction: column; gap: 12px; }
 #toast { position: fixed; left: 16px; right: 16px; margin: 0 auto; width: fit-content; bottom: calc(var(--bottom) + 76px); z-index: 20; max-width: 520px; display: flex; align-items: center; gap: 12px; background: var(--ink); color: var(--bg); border-radius: 14px; padding: 10px 14px; font-size: 14.5px; box-shadow: 0 4px 14px #0004; }
 #toast button { border: 0; background: none; color: #ff9db4; font-weight: 700; padding: 4px; }
 @media (prefers-reduced-motion: reduce) { .sheet { animation: none; } }
+
+/* breastfeeding timer */
+.nurse { background: var(--feed); }
+.nurse-head { display: flex; align-items: baseline; justify-content: space-between; font-weight: 600; }
+#nurse-clock { font-size: 34px; font-variant-numeric: tabular-nums; line-height: 1; }
+.nurse .side { border: 2px solid transparent; border-radius: 16px; background: var(--card); padding: 12px 6px; display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 92px; }
+.nurse .side b { font-size: 17px; }
+.nurse .side-time { font-size: 20px; font-variant-numeric: tabular-nums; }
+.nurse .side.on { border-color: var(--primary); }
+.nurse .btn.danger { background: none; }
