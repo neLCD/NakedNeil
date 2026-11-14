@@ -3,9 +3,9 @@ const NS = 'http://www.w3.org/2000/svg';
 const PATHS = {
   home: 'M3 11l9-8 9 8M5 10v10h14V10M10 20v-6h4v6',
   trends: 'M5 20v-7M12 20V5M19 20V10M3 20h18',
-  play: 'M12 3l4.5 7h-9zM13 13h8v8h-8zM7 13a4 4 0 1 0 0 8 4 4 0 0 0 0-8z',
+  sound: 'M4 10v4h3l5 4V6l-5 4zM15.500 9.500a3.500 3.500 0 0 1 0 5M18 7a7 7 0 0 1 0 10',
   star: 'M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z',
-  more: 'M11 3l1.9 5.1L18 10l-5.1 1.9L11 17l-1.9-5.1L4 10l5.1-1.9zM19 15v5M16.5 17.5h5',
+  ideas: 'M11 3l1.9 5.1L18 10l-5.1 1.9L11 17l-1.9-5.1L4 10l5.1-1.9zM19 15v5M16.5 17.5h5',
   settings: 'M4 7h9M19 7h1M4 17h1M11 17h9M16 5a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM8 15a2 2 0 1 0 0 4 2 2 0 0 0 0-4z',
   close: 'M6 6l12 12M18 6L6 18',
   back: 'M15 5l-7 7 7 7',
@@ -20,7 +20,6 @@ const PATHS = {
   heart: 'M12 20s-7.500-4.600-7.500-10A4.200 4.200 0 0 1 12 7.500 4.200 4.200 0 0 1 19.500 10c0 5.400-7.500 10-7.500 10z',
   ruler: 'M4 15L15 4l5 5L9 20zM8 11l2 2M11 8l2 2M14 5l2 2',
   bubble: 'M4 5h16v11H9l-5 4z',
-  cart: 'M3 4h2l2.500 11h10L20 7H6.500M9 20a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM17 20a1 1 0 1 0 0-2 1 1 0 0 0 0 2z',
 };
 export function icon(name, size = 24) {
   const el = document.createElementNS(NS, 'svg');
