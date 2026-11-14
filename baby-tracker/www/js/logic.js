@@ -1,6 +1,7 @@
 // Pure logic: units, ages, daily summaries, built-in tips and the AI summary.
 // No DOM access here so it can be unit-tested with Node.
 import { FOOD_IDEAS, GEAR_IDEAS } from './content.js';
+import { ACTIVITIES, bandFor } from './activities.js';
 
 export const ML_PER_OZ = 29.5735;
 export const KG_PER_LB = 0.45359237;
@@ -12,6 +13,8 @@ export const uid = () => Date.now().toString(36) + Math.random().toString(36).sl
 
 // ---------- dates ----------
 export function dayStart(ts) { const d = new Date(ts); d.setHours(0, 0, 0, 0); return d.getTime(); }
+/** Local midnight `n` days away from the day containing `ts` (safe across daylight-saving changes). */
+export function addDays(ts, n) { const d = new Date(ts); return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n).getTime(); }
 export function parseDate(str) { // "YYYY-MM-DD" -> local midnight timestamp
   const [y, m, d] = String(str).split('-').map(Number);
   return new Date(y, (m || 1) - 1, d || 1).getTime();
@@ -76,6 +79,13 @@ export function fmtWeight(kg, units) {
   let oz = Math.round((kg / KG_PER_LB) * 16);
   return `${Math.floor(oz / 16)} lb ${oz % 16} oz`;
 }
+/** A weight difference, e.g. "+1 lb 12 oz" or "−200 g". */
+export function fmtWeightChange(kg, units) {
+  const sign = kg >= 0 ? '+' : '−', abs = Math.abs(kg);
+  if (units !== 'imperial') return `${sign}${abs >= 1 ? `${+abs.toFixed(2)} kg` : `${Math.round(abs * 1000)} g`}`;
+  const oz = Math.round((abs / KG_PER_LB) * 16);
+  return `${sign}${oz >= 16 ? `${Math.floor(oz / 16)} lb ${oz % 16} oz` : `${oz} oz`}`;
+}
 export const weightValue = (kg, units) => (units === 'imperial' ? kg / KG_PER_LB : kg); // for charts
 export const weightUnit = (units) => (units === 'imperial' ? 'lb' : 'kg');
 export const fmtHeight = (cm, units) => (units === 'imperial' ? `${+(cm / CM_PER_IN).toFixed(1)} in` : `${+cm.toFixed(1)} cm`);
@@ -88,13 +98,22 @@ const isDirty = (e) => e.type === 'diaper' && (e.kind === 'poop' || e.kind === '
 
 /** Milliseconds of sleep that fall inside [from, to). Sleep still in progress counts up to `now`. */
 export function sleepWithin(events, from, to, now = Date.now()) {
-  let total = 0;
-  for (const e of events) {
-    if (e.type !== 'sleep') continue;
-    const end = e.end ?? now;
-    total += Math.max(0, Math.min(end, to) - Math.max(e.start, from));
+  // Clip each sleep to the window, then merge overlaps so a double entry is not counted twice.
+  const spans = sleepSpans(events, from, to, now);
+  return spans.reduce((total, [a, b]) => total + (b - a), 0);
+}
+
+export function sleepSpans(events, from, to, now = Date.now()) {
+  const clipped = events.filter((e) => e.type === 'sleep')
+    .map((e) => [Math.max(e.start, from), Math.min(e.end ?? now, to)])
+    .filter(([a, b]) => b > a)
+    .sort((x, y) => x[0] - y[0]);
+  const merged = [];
+  for (const span of clipped) {
+    const last = merged[merged.length - 1];
+    if (last && span[0] <= last[1]) last[1] = Math.max(last[1], span[1]); else merged.push([...span]);
   }
-  return total;
+  return merged;
 }
 
 export function summarize(events, from, to, now = Date.now()) {
@@ -102,6 +121,7 @@ export function summarize(events, from, to, now = Date.now()) {
   const feeds = inRange.filter((e) => e.type === 'feed');
   return {
     feeds: feeds.length,
+    milkFeeds: feeds.filter((e) => e.method !== 'solid').length,
     bottleMl: feeds.reduce((s, e) => s + (e.method === 'bottle' ? e.amountMl || 0 : 0), 0),
     breastMin: feeds.reduce((s, e) => s + (e.method === 'breast' ? e.minutes || 0 : 0), 0),
     solids: feeds.filter((e) => e.method === 'solid').length,
@@ -110,6 +130,29 @@ export function summarize(events, from, to, now = Date.now()) {
     dirty: inRange.filter(isDirty).length,
     spitups: inRange.filter((e) => e.type === 'spitup').length,
   };
+}
+
+/** One summary per day for the last `count` days, oldest first; the last entry is today (partial). */
+export function dailySeries(events, count, now = Date.now()) {
+  const out = [];
+  for (let i = count - 1; i >= 0; i--) {
+    const from = addDays(now, -i), to = addDays(now, -i + 1);
+    out.push({ from, partial: i === 0, ...summarize(events, from, to, now) });
+  }
+  return out;
+}
+/** Sleep blocks and feed times for one day as fractions of 24 hours, for the day-pattern strip. */
+export function dayPattern(events, from, now = Date.now()) {
+  const to = addDays(from, 1), len = to - from;
+  return {
+    sleeps: sleepSpans(events, from, Math.min(to, Math.max(now, from)), now).map(([a, b]) => [(a - from) / len, (b - from) / len]),
+    feeds: events.filter((e) => e.type === 'feed' && e.start >= from && e.start < to).map((e) => (e.start - from) / len),
+  };
+}
+/** Average of `pick(day)` over complete days that have anything logged; null when there are none. */
+export function dailyAverage(series, pick) {
+  const full = series.filter((d) => !d.partial && (d.feeds || d.sleepMs || d.wet || d.dirty));
+  return full.length ? full.reduce((s, d) => s + pick(d), 0) / full.length : null;
 }
 
 export function lastEvent(events, pred) {
@@ -209,9 +252,12 @@ export function buildTips(state, now = Date.now()) {
     const totals = [1, 2, 3].map((i) => sleepWithin(ev, today - i * DAY, today - (i - 1) * DAY, now) / HOUR).filter((h) => h > 0);
     if (totals.length >= 2) {
       const avg = totals.reduce((a, b) => a + b, 0) / totals.length;
-      if (avg < range[0] - 1) {
+      if (avg < range[0] - 1.5) {
         tips.push({ icon: '😴', title: `About ${avg.toFixed(1)} hours of sleep a day lately`,
           text: `Babies this age typically sleep ${range[0]} to ${range[1]} hours in 24 hours, naps included. An earlier bedtime or an extra nap may help. Every baby differs, and unlogged naps will lower this number.` });
+      } else if (avg < range[0]) {
+        tips.push({ icon: '😴', title: `About ${avg.toFixed(1)} hours of sleep a day lately`,
+          text: `That is a little under the typical ${range[0]} to ${range[1]} hours for this age. Unlogged naps will lower the number, and babies vary.` });
       } else {
         tips.push({ tone: 'good', icon: '😴', title: `Sleep looks on track (${avg.toFixed(1)} h a day)`,
           text: `Typical for this age is ${range[0]} to ${range[1]} hours in 24 hours, naps included.` });
@@ -249,6 +295,16 @@ export function buildTips(state, now = Date.now()) {
     }
   }
 
+  // Play
+  if (months != null) {
+    const log = state.activityLog || [];
+    if (!log.some((a) => now - parseDate(a.date) < 3 * DAY)) {
+      const done = new Set(log.map((a) => a.activityId)), band = bandFor(months);
+      const idea = ACTIVITIES.find((a) => a.from === band.from && !done.has(a.id)) || ACTIVITIES.find((a) => a.from === band.from);
+      if (idea) tips.push({ icon: idea.icon, title: `Play idea: ${idea.name}`, text: `${idea.how} More ideas are in the Play tab.` });
+    }
+  }
+
   // Words
   if (months != null && months >= 9 && state.words.length === 0) {
     tips.push({ icon: '💬', title: 'Listening for a first word', text: 'First words often arrive around 12 months, give or take a few. Talking, reading and naming things all help. Log the first one under Firsts.' });
@@ -274,13 +330,13 @@ export function aiSummary(state, now = Date.now()) {
   const b = state.baby;
   lines.push(`Baby: ${b.name || 'unnamed'}${b.birthDate ? `, ${ageLabel(b.birthDate, now)} (born ${b.birthDate})` : ', age unknown'}.`);
   const today = dayStart(now);
-  lines.push('Daily log, most recent first (feeds / bottle volume / breastfeeding minutes / solid meals / sleep hours / wet / dirty / spit-ups):');
+  lines.push('Daily log, most recent first (milk feeds / bottle volume / breastfeeding minutes / solid meals / sleep hours / wet / dirty / spit-ups):');
   let any = false;
   for (let i = 0; i < 7; i++) {
     const from = today - i * DAY, s = summarize(state.events, from, from + DAY, now);
     if (!s.feeds && !s.sleepMs && !s.wet && !s.dirty && !s.spitups) continue;
     any = true;
-    lines.push(`- ${i === 0 ? 'today so far' : toDateInput(from)}: ${s.feeds} feeds / ${fmtVolume(s.bottleMl, u)} / ${s.breastMin} min / ${s.solids} solids / ${(s.sleepMs / HOUR).toFixed(1)} h / ${s.wet} wet / ${s.dirty} dirty / ${s.spitups} spit-ups`);
+    lines.push(`- ${i === 0 ? 'today so far' : toDateInput(from)}: ${s.milkFeeds} milk feeds / ${fmtVolume(s.bottleMl, u)} / ${s.breastMin} min / ${s.solids} solids / ${(s.sleepMs / HOUR).toFixed(1)} h / ${s.wet} wet / ${s.dirty} dirty / ${s.spitups} spit-ups`);
   }
   if (!any) lines.push('- nothing logged in the last 7 days');
   const growth = [...state.growth].sort((a, b2) => b2.date.localeCompare(a.date)).slice(0, 4);
@@ -288,6 +344,8 @@ export function aiSummary(state, now = Date.now()) {
   if (state.foods.length) lines.push('Foods tried: ' + state.foods.map((f) => `${f.name}${f.reaction ? ` (${f.reaction})` : ''}${f.allergy ? ' [possible reaction noted]' : ''}`).join(', ') + '.');
   else lines.push('Foods tried: none yet.');
   if (state.words.length) lines.push('Words so far: ' + state.words.map((w) => w.word).join(', ') + '.');
+  const played = (state.activityLog || []).filter((a) => now - parseDate(a.date) < 7 * DAY).map((a) => a.name);
+  if (played.length) lines.push('Activities done in the last 7 days: ' + [...new Set(played)].join(', ') + '.');
   const toBuy = state.gear.filter((g) => !g.bought).map((g) => g.name), owned = state.gear.filter((g) => g.bought).map((g) => g.name);
   if (toBuy.length) lines.push('Gear wishlist: ' + toBuy.join(', ') + '.');
   if (owned.length) lines.push('Gear already owned: ' + owned.join(', ') + '.');

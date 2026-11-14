@@ -37,7 +37,7 @@ test('daily summary counts feeds, diapers, and clips sleep to the day', () => {
     { id: '9', type: 'feed', method: 'bottle', amountMl: 90, start: at(2026, 11, 13, 22) }, // yesterday
   ];
   const s = L.summarize(events, day, day + L.DAY, NOW);
-  assert.deepEqual(s, { feeds: 3, bottleMl: 120, breastMin: 15, solids: 1, sleepMs: 7 * L.HOUR, wet: 2, dirty: 1, spitups: 1 });
+  assert.deepEqual(s, { feeds: 3, milkFeeds: 2, bottleMl: 120, breastMin: 15, solids: 1, sleepMs: 7 * L.HOUR, wet: 2, dirty: 1, spitups: 1 });
   assert.equal(L.currentSleep(events).id, '8');
   assert.equal(L.lastEvent(events, (e) => e.type === 'feed').id, '3');
 });
@@ -81,7 +81,7 @@ test('AI summary includes the essentials and no more than 7 days', () => {
   s.gear.push({ id: 'g', name: 'High chair', bought: false });
   const text = L.aiSummary(s, NOW);
   assert.match(text, /Baby: Mia, 6 months/);
-  assert.match(text, /today so far: 1 feeds \/ 150 ml/);
+  assert.match(text, /today so far: 1 milk feeds \/ 150 ml/);
   assert.equal(text.match(/feeds \//g).length, 2); // header + one day only
   assert.match(text, /Foods tried: Banana \(loved\)/);
   assert.match(text, /Gear wishlist: High chair/);
@@ -105,4 +105,57 @@ test('breastfeeding timer: switch sides, pause, and log', () => {
   assert.equal(short.minutes, 1); // never logs a 0-minute feed
   assert.equal(L.fmtClock(65000), '01:05');
   assert.equal(L.fmtClock(3725000), '1:02:05');
+});
+
+test('daily series and averages for the trend charts', () => {
+  const ev = [];
+  for (let d = 1; d <= 3; d++) {
+    ev.push({ id: `s${d}`, type: 'sleep', start: at(2026, 11, 14 - d, 20), end: at(2026, 11, 15 - d, 6) }); // 10h spanning midnight
+    for (let i = 0; i < 5 + d; i++) ev.push({ id: `p${d}${i}`, type: 'diaper', kind: i ? 'pee' : 'both', start: at(2026, 11, 14 - d, 8 + i) });
+  }
+  const series = L.dailySeries(ev, 7, NOW);
+  assert.equal(series.length, 7);
+  assert.equal(series[6].partial, true);
+  assert.equal(series[6].from, at(2026, 11, 14));
+  assert.deepEqual(series.slice(3).map((d) => d.wet), [8, 7, 6, 0]);
+  assert.deepEqual(series.slice(3).map((d) => d.dirty), [1, 1, 1, 0]);
+  assert.deepEqual(series.slice(2).map((d) => d.sleepMs / L.HOUR), [0, 4, 10, 10, 6]);
+  assert.equal(L.dailyAverage(series, (d) => d.wet), 7); // only the 3 full days with logs
+  assert.equal(L.dailyAverage(L.dailySeries([], 7, NOW), (d) => d.wet), null);
+  assert.equal(L.addDays(at(2026, 3, 8, 15), 1), at(2026, 3, 9)); // across a US daylight-saving change
+});
+
+test('overlapping sleeps are merged, not double-counted', () => {
+  const ev = [
+    { id: 'a', type: 'sleep', start: at(2026, 11, 14, 13), end: at(2026, 11, 14, 14) },
+    { id: 'b', type: 'sleep', start: at(2026, 11, 14, 13, 30), end: at(2026, 11, 14, 14, 30) }, // overlaps a
+    { id: 'c', type: 'sleep', start: at(2026, 11, 14, 14), end: null },                          // still asleep at 15:00
+  ];
+  assert.equal(L.sleepWithin(ev, at(2026, 11, 14), at(2026, 11, 15), NOW), 2 * L.HOUR);
+  const p = L.dayPattern([...ev, { id: 'f', type: 'feed', method: 'bottle', start: at(2026, 11, 14, 12) }], at(2026, 11, 14), NOW);
+  assert.deepEqual(p.sleeps, [[13 / 24, 15 / 24]]);
+  assert.deepEqual(p.feeds, [0.5]);
+});
+
+test('weight change wording and sleep tip tiers', () => {
+  assert.equal(L.fmtWeightChange(28 / 16 * L.KG_PER_LB, 'imperial'), '+1 lb 12 oz');
+  assert.equal(L.fmtWeightChange(-0.2, 'metric'), '−200 g');
+  assert.equal(L.fmtWeightChange(1.25, 'metric'), '+1.25 kg');
+  const withSleep = (hours) => {
+    const s = blank();
+    for (let d = 1; d <= 3; d++) s.events.push({ id: `s${d}`, type: 'sleep', start: at(2026, 11, 14 - d, 1), end: at(2026, 11, 14 - d, 1) + hours * L.HOUR });
+    return L.buildTips(s, NOW).find((t) => t.icon === '😴');
+  };
+  assert.equal(withSleep(13).tone, 'good');            // typical for 6 months is 12 to 16
+  assert.match(withSleep(11.1).text, /a little under/); // no "on track" verdict below the range
+  assert.equal(withSleep(11.1).tone, undefined);
+  assert.match(withSleep(9).text, /earlier bedtime/);
+});
+
+test('a play idea is suggested when nothing has been done for 3 days', () => {
+  const s = blank();
+  assert.match(L.buildTips(s, NOW).find((t) => /^Play idea/.test(t.title)).title, /Peekaboo/); // 6 to 9 month band
+  s.activityLog = [{ id: '1', activityId: 'peekaboo', name: 'Peekaboo', date: '2026-11-13' }];
+  assert.ok(!L.buildTips(s, NOW).some((t) => /^Play idea/.test(t.title)));
+  assert.match(L.aiSummary(s, NOW), /Activities done in the last 7 days: Peekaboo/);
 });
