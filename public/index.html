@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Ping! Messenger</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main id="desktop" aria-label="Desktop"></main>
+  <footer id="taskbar">
+    <div id="start"><img src="favicon.svg" alt="" width="18" height="18"> Ping!</div>
+    <div id="tasks" role="tablist" aria-label="Open windows"></div>
+    <div id="tray">
+      <button id="mute" type="button" title="Sounds on/off" aria-label="Toggle sounds">🔊</button>
+      <span id="clock"></span>
+    </div>
+  </footer>
+  <div id="toasts" aria-live="polite"></div>
+  <noscript>Ping! Messenger needs JavaScript. (It is not 1996 any more, sorry.)</noscript>
+  <script src="js/app.js"></script>
+</body>
+</html>
