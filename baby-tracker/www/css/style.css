@@ -179,7 +179,8 @@ form { display: flex; flex-direction: column; gap: 14px; }
 .nurse .side.on { border-color: var(--feed-ink); }
 
 /* ---------- sounds (sounds.js) ---------- */
-/* the Sounds screen and its now-playing strip are styled here */
+/* sounds.js injects its own .snd-* rules; it relies on card, cardhead, seg, field, btn, fine, pad, warnbox
+   and the variables --ink2, --primary, --sleep, --sleep-ink, so keep those */
 
 /* ---------- trends: charts (chart.js) ---------- */
 .sw.s1, .chart .bar.s1 { background: var(--series); fill: var(--series); }

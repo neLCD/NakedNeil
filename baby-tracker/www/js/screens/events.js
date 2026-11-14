@@ -5,6 +5,7 @@ import { h, num, toast, openSheet, closeSheet, field, seg } from '../ui.js';
 import { state, save, units, view, go, showDay } from '../store.js';
 import { actions, timeInput, noteInput, badTime, formSheet, removeWithUndo } from '../forms.js';
 import { FOOD_IDEAS } from '../content.js';
+import { playSound, soundPlaying } from '../sounds.js';
 
 function upsertEvent(ev) {
   const i = state.events.findIndex((e) => e.id === ev.id);
@@ -67,11 +68,19 @@ export function feedSheet(existing, preset) {
   }, existing && (() => removeWithUndo('events', existing)));
 }
 
+/** Start a sleep now. With `noise`, the white noise starts too (same sound and timer as last time). */
+function startSleep(noise) {
+  state.events.push({ id: L.uid(), type: 'sleep', start: Date.now(), end: null });
+  if (noise) playSound();
+  closeSheet(); save();
+  toast(noise ? 'Sleep and white noise started. Sweet dreams!' : 'Sleep started. Sweet dreams!', 'Sounds', () => go('sounds'));
+}
 export function sleepSheet(existing) {
   if (!existing) {
     const draft = { id: L.uid(), type: 'sleep', start: Date.now() - L.HOUR, end: Date.now() };
     openSheet('Sleep',
-      h('button', { class: 'btn primary block', type: 'button', onclick: () => { state.events.push({ id: L.uid(), type: 'sleep', start: Date.now(), end: null }); closeSheet(); save(); toast('Sleep started. Sweet dreams!', 'Sounds', () => go('sounds')); } }, 'Start sleep now'),
+      h('button', { class: 'btn primary block', type: 'button', onclick: () => startSleep(false) }, 'Start sleep now'),
+      !soundPlaying() && h('button', { class: 'btn block', type: 'button', onclick: () => startSleep(true) }, 'Start sleep with white noise'),
       h('p', { class: 'divider' }, 'or log a sleep that already happened'),
       h('form', {
         onsubmit: (e) => {
