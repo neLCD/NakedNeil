@@ -21,6 +21,7 @@ export function settingsSheet() {
   ], () => {
     const url = d.aiUrl.trim();
     if (url && !/^https?:\/\//i.test(url)) return 'The AI address must start with http:// or https://';
+    if (d.birthDate && L.parseDate(d.birthDate) > Date.now()) return 'The birth date is in the future.';
     state.baby = { name: d.name.trim(), birthDate: d.birthDate };
     state.settings = { units: d.units, currency: d.currency.trim() || '$', aiUrl: url };
   });
@@ -50,9 +51,9 @@ async function exportBackup() {
     if (!/cancel/i.test(String(err && err.message))) toast('Could not share the file. Use Copy as text instead.');
   }
 }
-function backupSheet() {
+export function backupSheet() {
   const box = h('textarea', { rows: 5, class: 'mono', value: JSON.stringify(state), 'aria-label': 'Backup data as text' });
-  const picker = h('input', { type: 'file', accept: '.json,application/json', hidden: true, onchange: async (e) => { const f = e.target.files[0]; if (f) restoreBackup(await f.text()); } });
+  const picker = h('input', { type: 'file', accept: '.json,application/json', hidden: true, onchange: async (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) restoreBackup(await f.text()); } }); // reset, so the same file can be picked again
   openSheet('Back up / restore',
     h('p', null, 'TinyLog keeps everything on this phone only. Save a backup file somewhere else (Drive, email) so a lost phone does not mean a lost log.'),
     h('div', { class: 'row2' },

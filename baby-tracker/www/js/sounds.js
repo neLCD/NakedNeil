@@ -203,7 +203,7 @@ export function viewSounds({ render } = {}) {
           ? h('button', { class: 'btn small', type: 'button', onclick: stopCasting }, 'Disconnect')
           : h('button', { class: 'btn small', type: 'button', onclick: chooseSpeaker }, 'Choose speaker'))),
       h('p', { class: 'fine' }, 'A Bluetooth speaker needs no setup here: connect it in Android settings and the sound follows.')),
-    h('p', { class: 'fine pad' }, 'Keep it gentle: about as loud as a quiet shower, with the phone or speaker at least 2 metres (7 feet) from the cot, never inside it. White noise is a settling aid, so use the timer when you can.'),
+    h('p', { class: 'fine pad' }, 'Keep it gentle: no louder than a quiet conversation (about 50 decibels), with the phone or speaker at least 2 metres (7 feet) from the cot, never inside it. White noise is a settling aid, so use the timer when you can.'),
   ];
 }
 

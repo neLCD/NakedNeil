@@ -2,6 +2,8 @@ name: Build TinyLog (Android)
 
 on:
   push:
+    tags: ['v*']
+    branches: ['**']
     paths:
       - 'baby-tracker/**'
       - '.github/workflows/android.yml'
@@ -50,20 +52,23 @@ jobs:
           name: TinyLog-debug-apk
           path: baby-tracker/android/app/build/outputs/apk/debug/app-debug.apk
 
-      # Play Store bundle: only when the signing secrets have been added to the repository.
+      # Play Store bundle: only when run by hand (Actions > Run workflow) or for a version tag,
+      # and only when the signing secrets have been added to the repository.
       - name: Build signed release bundle (.aab)
-        if: env.HAS_KEYSTORE == 'true'
+        if: env.HAS_KEYSTORE == 'true' && (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v'))
         working-directory: baby-tracker/android
         env:
+          TINYLOG_KEYSTORE_BASE64: ${{ secrets.TINYLOG_KEYSTORE_BASE64 }}
           TINYLOG_KEYSTORE_PASSWORD: ${{ secrets.TINYLOG_KEYSTORE_PASSWORD }}
           TINYLOG_KEY_ALIAS: ${{ secrets.TINYLOG_KEY_ALIAS }}
           TINYLOG_KEY_PASSWORD: ${{ secrets.TINYLOG_KEY_PASSWORD }}
         run: |
-          echo "${{ secrets.TINYLOG_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/tinylog.keystore"
+          printf '%s' "$TINYLOG_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/tinylog.keystore"
           TINYLOG_KEYSTORE_FILE="$RUNNER_TEMP/tinylog.keystore" ./gradlew --no-daemon bundleRelease
+          rm -f "$RUNNER_TEMP/tinylog.keystore"
 
       - uses: actions/upload-artifact@v4
-        if: env.HAS_KEYSTORE == 'true'
+        if: env.HAS_KEYSTORE == 'true' && (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v'))
         with:
           name: TinyLog-release-aab
           path: baby-tracker/android/app/build/outputs/bundle/release/app-release.aab

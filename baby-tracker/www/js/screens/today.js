@@ -7,6 +7,7 @@ import { icon } from '../icons.js';
 import { feedSheet, sleepSheet, editEvent } from './events.js';
 
 function quickLog(ev, label) {
+  if (Date.now() < view.tapGuard) return; // a stray second tap where another button just was
   const full = { id: L.uid(), start: Date.now(), note: '', ...ev };
   state.events.push(full);
   view.day = null;
@@ -49,7 +50,8 @@ export function viewToday() {
     h('section', { class: 'card' },
       h('div', { class: 'daynav' },
         h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Previous day', onclick: () => { view.day = L.addDays(viewDay(), -1); render(); } }, icon('back', 20)),
-        h('h2', null, isToday ? 'Today' : fmtDay(from)),
+        isToday ? h('h2', null, 'Today')
+          : h('button', { class: 'dayback', type: 'button', onclick: () => { view.day = null; render(); } }, h('b', null, fmtDay(from)), h('small', null, 'Back to today')),
         h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Next day', disabled: isToday, onclick: () => { showDay(L.addDays(viewDay(), 1)); render(); } }, icon('next', 20))),
       h('div', { class: 'stats' },
         stat('Milk feeds', s.milkFeeds),
@@ -81,7 +83,7 @@ function viewWelcome() {
     h('img', { class: 'hero', src: 'icon.svg', alt: '', width: 84, height: 84 }),
     h('h2', null, 'Welcome to TinyLog'),
     h('p', null, 'Track feeds, sleep, diapers, growth and all the firsts. Everything stays on this phone.'),
-    h('form', { onsubmit: (e) => { e.preventDefault(); state.baby = { name: d.name.trim(), birthDate: d.birthDate }; save(); } },
+    h('form', { onsubmit: (e) => { e.preventDefault(); if (!d.name.trim()) return toast('Please type a name.'); state.baby = { name: d.name.trim(), birthDate: d.birthDate }; save(); } },
       field('Baby’s name', h('input', { type: 'text', maxLength: 40, required: true, value: d.name, oninput: (e) => { d.name = e.target.value; } })),
       field('Birth date', h('input', { type: 'date', required: true, value: d.birthDate, max: L.toDateInput(Date.now()), oninput: (e) => { d.birthDate = e.target.value; } })),
       h('button', { class: 'btn primary block', type: 'submit' }, 'Get started')));
@@ -104,6 +106,9 @@ function nursingCard() {
       h('button', { class: 'btn danger', type: 'button', onclick: () => { if (confirm('Discard this feed without logging it?')) { state.nursing = null; save(); } } }, 'Discard'),
       h('button', { class: 'btn primary', type: 'button', onclick: () => {
         const ev = L.nursingToFeed(state.nursing);
+        // a timer left running for hours is almost always a forgotten one
+        if (ev.minutes > 90 && !confirm(`Log a feed of ${L.fmtDuration(ev.minutes * 60000)}? If the timer was left running, tap Cancel and use Discard, then enter the feed by hand.`)) return;
+        view.tapGuard = Date.now() + 700; // Spit-up moves under the finger when this card disappears
         state.nursing = null; state.events.push(ev); showDay(ev.start); save();
         toast(`Breastfeed logged: ${L.describeEvent(ev, units()).detail}`, 'Edit', () => editEvent(ev));
       } }, '■ Stop and log')));

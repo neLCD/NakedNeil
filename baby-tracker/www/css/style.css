@@ -232,3 +232,10 @@ form { display: flex; flex-direction: column; gap: 14px; }
   .chip span { font-size: 12px; }
   .seg button { font-size: 13.5px; }
 }
+
+/* ---------- QA round: save warning, back-to-today, small links ---------- */
+.savewarn { margin: 0 16px 8px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.dayback { border: 0; background: none; display: flex; flex-direction: column; align-items: center; min-height: 44px; padding: 0 8px; }
+.dayback b { font-size: 17px; }
+.dayback small { color: var(--primary); font-weight: 600; }
+.linkish.small { font-size: 13px; align-self: flex-start; min-height: 32px; }

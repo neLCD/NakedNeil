@@ -1,6 +1,6 @@
 // Growth (inside Trends): weight and height measurements with a chart each.
 import * as L from '../logic.js';
-import { h, num, fmtDate, field, stat } from '../ui.js';
+import { h, num, fmtDate, field, stat, toast } from '../ui.js';
 import { state, units } from '../store.js';
 import { formSheet, removeWithUndo } from '../forms.js';
 import { lineChart } from '../chart.js';
@@ -30,6 +30,7 @@ function growthSheet(existing) {
     if (same) {
       state.growth = state.growth.filter((g) => g.id !== entry.id);
       same.weightKg = entry.weightKg ?? same.weightKg; same.heightCm = entry.heightCm ?? same.heightCm;
+      setTimeout(() => toast('Updated the measurement already saved for that date.'), 50);
       return;
     }
     const i = state.growth.findIndex((g) => g.id === entry.id);

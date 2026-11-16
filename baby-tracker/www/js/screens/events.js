@@ -24,6 +24,7 @@ export function feedSheet(existing, preset) {
     content: lastBottle ? lastBottle.content : 'Formula', amountMl: lastBottle ? lastBottle.amountMl : undefined,
   };
   if (draft.amountMl) draft.amount = L.volumeFromMl(draft.amountMl, units());
+  const shownAmount = draft.amount; // to tell an untouched amount from an edited one
   formSheet(existing ? 'Edit feed' : 'Log a feed', draft, (d, redraw) => [
     seg([['breast', 'Breast'], ['bottle', 'Bottle'], ['solid', 'Solid']], d.method, (v) => { d.method = v; redraw(); }),
     d.method === 'breast' && !existing && [
@@ -55,7 +56,13 @@ export function feedSheet(existing, preset) {
       // keep the timer's left/right split unless the entry was changed
       if (existing && existing.leftMin != null && ev.side === 'both' && ev.minutes === existing.minutes) { ev.leftMin = existing.leftMin; ev.rightMin = existing.rightMin; }
     }
-    if (d.method === 'bottle') { const a = num(d.amount); ev.amountMl = a ? L.volumeToMl(a, units()) : undefined; ev.content = d.content; }
+    if (d.method === 'bottle') {
+      const a = num(d.amount);
+      // an untouched amount keeps its exact stored value (no ml -> oz -> ml rounding drift)
+      ev.amountMl = existing && existing.amountMl && String(d.amount) === String(shownAmount) ? existing.amountMl : a ? L.volumeToMl(a, units()) : undefined;
+      if (ev.amountMl > 1000) return 'That is more than a litre in one bottle. Please check the amount.';
+      ev.content = d.content;
+    }
     if (d.method === 'solid') {
       ev.food = (d.food || '').trim();
       if (!ev.food) return 'What did they eat?';
@@ -70,6 +77,7 @@ export function feedSheet(existing, preset) {
 
 /** Start a sleep now. With `noise`, the white noise starts too (same sound and timer as last time). */
 function startSleep(noise) {
+  if (L.currentSleep(state.events)) return closeSheet(); // a second tap: the sleep is already running
   state.events.push({ id: L.uid(), type: 'sleep', start: Date.now(), end: null });
   if (noise) playSound();
   closeSheet(); save();
@@ -78,6 +86,7 @@ function startSleep(noise) {
 export function sleepSheet(existing) {
   if (!existing) {
     const draft = { id: L.uid(), type: 'sleep', start: Date.now() - L.HOUR, end: Date.now() };
+    let saved = false;
     openSheet('Sleep',
       h('button', { class: 'btn primary block', type: 'button', onclick: () => startSleep(false) }, 'Start sleep now'),
       !soundPlaying() && h('button', { class: 'btn block', type: 'button', onclick: () => startSleep(true) }, 'Start sleep with white noise'),
@@ -85,9 +94,12 @@ export function sleepSheet(existing) {
       h('form', {
         onsubmit: (e) => {
           e.preventDefault();
-          if (!draft.start || !draft.end || draft.end <= draft.start) return toast('Wake-up time must be after the start.');
+          if (saved) return;
+          const bad = badTime(draft); if (bad) return toast(bad);
+          if (!draft.end || draft.end <= draft.start) return toast('Wake-up time must be after the start.');
           if (draft.end > Date.now() + 5 * 60000) return toast('That time is in the future. Please check the date.');
           if (draft.end - draft.start > 16 * L.HOUR && !confirm(`Save a sleep of ${L.fmtDuration(draft.end - draft.start)}?`)) return;
+          saved = true;
           showDay(draft.start);
           state.events.push({ ...draft, note: (draft.note || '').trim() }); closeSheet(); save();
         },

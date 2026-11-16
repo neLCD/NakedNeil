@@ -9,7 +9,7 @@ import { viewToday, tickNursing } from './screens/today.js';
 import { viewTrends } from './screens/trends.js';
 import { viewFirsts } from './screens/firsts.js';
 import { viewIdeas } from './screens/ideas.js';
-import { settingsSheet } from './screens/settings.js';
+import { settingsSheet, backupSheet } from './screens/settings.js';
 import { viewSounds, soundsBar } from './sounds.js';
 
 // id, icon, label, screen
@@ -29,9 +29,22 @@ function render() {
       h('div', null, h('h1', null, b.name || 'TinyLog'), h('small', null, b.birthDate ? L.ageLabel(b.birthDate) : 'Baby tracker'))),
     h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Settings', onclick: settingsSheet }, icon('settings', 22)));
   // While a sound is playing, a slim strip stays above every other screen so it can be stopped from anywhere.
-  $('playing').replaceChildren(...clean([view.tab !== 'sounds' && soundsBar({ render, open: () => go('sounds') })]));
+  $('playing').replaceChildren(...clean([
+    view.saveFailed && h('div', { class: 'warnbox savewarn', role: 'alert' },
+      h('span', null, 'Not saved. This phone would not store your last change, so it will be lost when the app closes. Free up some storage, then log it again.'),
+      h('button', { class: 'linkish', type: 'button', onclick: backupSheet }, 'Back up now')),
+    view.tab !== 'sounds' && soundsBar({ render, open: () => go('sounds') }),
+  ]));
   const scroller = $('view'), keep = scroller.dataset.tab === view.tab ? scroller.scrollTop : 0;
-  scroller.replaceChildren(...clean([screen()]));
+  let content;
+  try { content = screen(); } catch (err) {
+    // One bad record must never leave a blank screen: say so and offer the way out.
+    console.error(err);
+    content = h('section', { class: 'card' }, h('h2', null, 'This screen could not be shown'),
+      h('p', null, 'Something in the saved data could not be read. Your logs are still on this phone. Save a backup first, then try the other tabs.'),
+      h('button', { class: 'btn primary block', type: 'button', onclick: backupSheet }, 'Back up / restore'));
+  }
+  scroller.replaceChildren(...clean([content]));
   scroller.dataset.tab = view.tab;
   scroller.scrollTop = keep;
   tickNursing();
@@ -47,5 +60,5 @@ render();
 
 // Keep "x minutes" figures fresh, but never rebuild the screen under someone who is typing.
 const typing = () => ['INPUT', 'TEXTAREA', 'SELECT'].includes((document.activeElement || {}).tagName);
-setInterval(() => { if (view.tab === 'today' && !sheetIsOpen() && !document.hidden && !typing()) render(); }, 30000);
+setInterval(() => { if ((view.tab === 'today' || view.tab === 'trends') && !sheetIsOpen() && !document.hidden && !typing()) render(); }, 30000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden && !sheetIsOpen() && !typing()) render(); });

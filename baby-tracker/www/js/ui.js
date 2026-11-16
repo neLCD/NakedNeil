@@ -20,7 +20,8 @@ export const $ = (id) => document.getElementById(id);
 
 // ---------- formatting and parsing ----------
 export const fmtTime = (ts) => new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-export const fmtDay = (ts) => new Date(ts).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+/** "Sat, Nov 14", with the year added when it is not this year. */
+export const fmtDay = (ts) => new Date(ts).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', ...(new Date(ts).getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}) });
 export const fmtDate = (ts, long) => new Date(ts).toLocaleDateString([], long ? { year: 'numeric', month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric' });
 /** A number typed into a form, or null when it is empty, negative or not a number. */
 export const num = (v) => { const n = parseFloat(String(v).replace(',', '.')); return Number.isFinite(n) && n >= 0 ? n : null; };
@@ -44,7 +45,7 @@ export function toast(text, actionLabel, action) {
 export const hideToast = () => { $('toast').hidden = true; };
 
 // ---------- bottom sheet ----------
-let sheetOpen = false;
+let sheetOpen = false, closing = false;
 export const sheetIsOpen = () => sheetOpen;
 export function openSheet(title, ...content) {
   const root = $('sheet-root');
@@ -68,9 +69,14 @@ export function openSheet(title, ...content) {
   history.pushState({ sheet: true }, ''); // Android back closes the sheet
   return panel.querySelector('.sheet-body');
 }
-function removeSheet() { sheetOpen = false; $('sheet-root').hidden = true; $('sheet-root').replaceChildren(); }
-export function closeSheet() { if (sheetOpen && history.state && history.state.sheet) history.back(); else removeSheet(); }
+function removeSheet() { sheetOpen = false; closing = false; $('sheet-root').hidden = true; $('sheet-root').replaceChildren(); }
+/** Close the sheet. Safe to call twice (a double tap must not go "back" twice and leave the app). */
+export function closeSheet() {
+  if (!sheetOpen || closing) return;
+  if (history.state && history.state.sheet) { closing = true; history.back(); } else removeSheet();
+}
 window.addEventListener('popstate', removeSheet);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && sheetOpen) closeSheet(); });
 
 // ---------- small controls ----------
 export const field = (label, input, hint) => h('label', { class: 'field' }, h('span', null, label), input, hint && h('small', null, hint));

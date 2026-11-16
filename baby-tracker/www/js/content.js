@@ -39,7 +39,10 @@ export const FOODS_TO_AVOID = [
   'Honey before 12 months (risk of infant botulism)',
   'Cow’s milk as a main drink before 12 months (fine in cooking and as yogurt or cheese)',
   'Whole nuts, whole grapes, popcorn, hard raw vegetables and other choking hazards',
-  'Added salt and sugar',
+  'Added salt and sugar, and juice or other sweet drinks',
+  'Water before 6 months (after that, sips of water with meals are fine)',
+  'Fish high in mercury, such as shark, swordfish and marlin',
+  'Rice drinks as a milk substitute, and mould-ripened or blue cheeses',
   'Unpasteurised dairy, and raw or runny egg unless your local guidance says it is safe',
 ];
 
@@ -49,7 +52,7 @@ export const GEAR_IDEAS = [
   { name: 'Car seat', category: 'Travel', fromMonths: 0 },
   { name: 'Cot or bassinet', category: 'Sleep', fromMonths: 0 },
   { name: 'Firm cot mattress', category: 'Sleep', fromMonths: 0 },
-  { name: 'Swaddles or sleep sacks', category: 'Sleep', fromMonths: 0 },
+  { name: 'Swaddles or sleep sacks', category: 'Sleep', fromMonths: 0, toMonths: 2, note: 'Stop swaddling at the first signs of rolling; sleep sacks are fine after that.' },
   { name: 'Changing mat', category: 'Changing', fromMonths: 0 },
   { name: 'Bottles', category: 'Feeding', fromMonths: 0 },
   { name: 'Burp cloths', category: 'Feeding', fromMonths: 0 },
@@ -67,6 +70,6 @@ export const GEAR_IDEAS = [
   { name: 'Stair gates', category: 'Safety', fromMonths: 7 },
   { name: 'Cabinet locks', category: 'Safety', fromMonths: 7 },
   { name: 'Outlet covers', category: 'Safety', fromMonths: 7 },
-  { name: 'Next-stage car seat', category: 'Travel', fromMonths: 9 },
+  { name: 'Next-stage car seat', category: 'Travel', fromMonths: 9, note: 'When the infant seat is outgrown by height or weight. Keep rear-facing for as long as the seat allows.' },
   { name: 'First shoes', category: 'Clothing', fromMonths: 11 },
 ];

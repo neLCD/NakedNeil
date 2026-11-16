@@ -38,10 +38,10 @@ export function viewGear() {
     g.url && h('a', { class: 'btn small', href: g.url, target: '_blank', rel: 'noopener noreferrer' }, 'Shop'));
   const have = new Set(state.gear.map((g) => g.name.trim().toLowerCase()));
   const months = L.ageMonths(state.baby.birthDate) ?? 0;
-  const ideas = GEAR_IDEAS.filter((g) => !have.has(g.name.toLowerCase()));
+  const ideas = GEAR_IDEAS.filter((g) => !have.has(g.name.toLowerCase()) && (g.toMonths == null || months <= g.toMonths));
   const now = ideas.filter((g) => g.fromMonths <= months + 1.5), later = ideas.filter((g) => g.fromMonths > months + 1.5);
   const ideaList = (list) => h('ul', { class: 'ideas' }, list.map((g) => h('li', null,
-    h('span', { class: 'grow' }, h('b', null, g.name), h('small', null, `${g.category}${g.fromMonths ? ` · from about ${g.fromMonths} months` : ''}`)),
+    h('span', { class: 'grow' }, h('b', null, g.name), h('small', null, `${g.category}${g.fromMonths ? ` · from about ${g.fromMonths} months` : ''}`), g.note && h('small', null, g.note)),
     h('button', { class: 'btn small', type: 'button', onclick: () => { state.gear.push({ id: L.uid(), name: g.name, category: g.category, priority: 'medium', bought: false, url: '' }); save(); toast(`${g.name} added to your list`); } }, '+ Add'))));
   return [
     h('section', { class: 'card' },

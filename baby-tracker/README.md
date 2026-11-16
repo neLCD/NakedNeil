@@ -55,7 +55,10 @@ Host it anywhere that runs Node and gives you an `https://` address, then either
 address into the app under **Settings > AI service address**, or set `DEFAULT_AI_URL` in
 [`www/js/config.js`](www/js/config.js) before building so every install has it.
 
-The server limits each address to 6 questions a minute (`RATE_LIMIT_PER_MINUTE`). Before a
+The server limits each address to 6 questions a minute (`RATE_LIMIT_PER_MINUTE`) and 2000 questions
+a day in total (`RATE_LIMIT_PER_DAY`, a ceiling on API spend). Behind a reverse proxy, set
+`TRUST_PROXY=1` so each visitor gets their own limit. Parents can flag an answer with "Report a
+problem with this answer"; flagged answers are written to the server log as `ANSWER REPORTED`. Before a
 public launch, add sign-in or an app check so that only your app can use your API key.
 
 ## Publishing to the Play Store
@@ -71,6 +74,14 @@ public launch, add sign-in or an app check so that only your app can use your AP
 4. Run the workflow again. It now also produces **TinyLog-release-aab**; upload that
    `.aab` file in the Play Console.
 5. For each new release, raise `versionCode` and `versionName` in `android/app/build.gradle`.
+
+Forms the Play Console will ask for, because of what the app does:
+
+- **Foreground service (media playback)**: for white noise with the screen off; needs a short demo video.
+- **Data safety**: the AI feature sends log summaries to your server, and Android's own device backup
+  (`allowBackup`) may copy the logs to the user's Google account.
+- **Health apps declaration**: the app records feeding, sleep and growth.
+- **AI-generated content**: the in-app "Report a problem with this answer" link is the reporting route.
 
 Play also asks for a privacy policy link, a Data safety form (the AI feature sends log
 summaries to your server), screenshots, and the 512 px icon in `store/`. The app id is
@@ -120,6 +131,7 @@ www/                the app: HTML, CSS and JavaScript modules, no build step
     gear.js         Ideas > Gear
     settings.js     Settings and backup (bottom sheet)
   js/sounds.js      Sounds: the screen and the now-playing strip
+  js/schema.js      shape of saved data; cleans anything loaded from storage or a backup
   js/logic.js       units, ages, daily summaries, built-in tips, AI summary (no DOM; unit-tested)
   js/chart.js       line, bar and day-pattern charts
   js/content.js     food ideas and gear ideas

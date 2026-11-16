@@ -31,15 +31,21 @@ export const fromDateTimeInput = (str) => new Date(str).getTime();
 
 export function ageDays(birthDate, now = Date.now()) {
   if (!birthDate) return null;
-  return Math.floor((dayStart(now) - parseDate(birthDate)) / DAY);
+  return daysBetween(parseDate(birthDate), now);
+}
+/** Whole calendar days from the day of `from` to the day of `to` (daylight-saving days count as one day). */
+export function daysBetween(from, to) {
+  const a = new Date(from), b = new Date(to);
+  return Math.round((Date.UTC(b.getFullYear(), b.getMonth(), b.getDate()) - Date.UTC(a.getFullYear(), a.getMonth(), a.getDate())) / DAY);
 }
 /** Whole calendar months between birth and now, plus the days since the last month-anniversary. */
 function calendarAge(birthDate, now) {
   const b = new Date(parseDate(birthDate)), n = new Date(dayStart(now));
+  // The monthly "birthday" in a given month, clamped to that month's last day (born on the 31st -> the 30th or 28th).
+  const birthdayIn = (m) => { const last = new Date(b.getFullYear(), b.getMonth() + m + 1, 0).getDate(); return new Date(b.getFullYear(), b.getMonth() + m, Math.min(b.getDate(), last)); };
   let months = (n.getFullYear() - b.getFullYear()) * 12 + (n.getMonth() - b.getMonth());
-  if (n.getDate() < b.getDate()) months -= 1;
-  const anniversary = new Date(b.getFullYear(), b.getMonth() + months, b.getDate());
-  return { months, extraDays: Math.round((n - anniversary) / DAY) };
+  if (n < birthdayIn(months)) months -= 1;
+  return { months, extraDays: daysBetween(birthdayIn(months).getTime(), n.getTime()) };
 }
 export function ageMonths(birthDate, now = Date.now()) {
   if (!birthDate) return null;
@@ -82,7 +88,7 @@ export function fmtWeight(kg, units) {
 /** A weight difference, e.g. "+1 lb 12 oz" or "−200 g". */
 export function fmtWeightChange(kg, units) {
   const sign = kg >= 0 ? '+' : '−', abs = Math.abs(kg);
-  if (units !== 'imperial') return `${sign}${abs >= 1 ? `${+abs.toFixed(2)} kg` : `${Math.round(abs * 1000)} g`}`;
+  if (units !== 'imperial') return `${sign}${Math.round(abs * 1000) >= 1000 ? `${+abs.toFixed(2)} kg` : `${Math.round(abs * 1000)} g`}`;
   const oz = Math.round((abs / KG_PER_LB) * 16);
   return `${sign}${oz >= 16 ? `${Math.floor(oz / 16)} lb ${oz % 16} oz` : `${oz} oz`}`;
 }
@@ -103,9 +109,11 @@ export function sleepWithin(events, from, to, now = Date.now()) {
   return spans.reduce((total, [a, b]) => total + (b - a), 0);
 }
 
+/** A sleep with no wake-up time counts for at most this long; beyond it, "Wake up" was almost certainly forgotten. */
+export const MAX_OPEN_SLEEP = 16 * HOUR;
 export function sleepSpans(events, from, to, now = Date.now()) {
   const clipped = events.filter((e) => e.type === 'sleep')
-    .map((e) => [Math.max(e.start, from), Math.min(e.end ?? now, to)])
+    .map((e) => [Math.max(e.start, from), Math.min(e.end ?? Math.min(now, e.start + MAX_OPEN_SLEEP), to)])
     .filter(([a, b]) => b > a)
     .sort((x, y) => x[0] - y[0]);
   const merged = [];
@@ -180,7 +188,8 @@ export function nursingTap(n, side, now = Date.now()) {
 export function nursingToFeed(n, now = Date.now()) {
   const { leftMs, rightMs, totalMs } = nursingElapsed(n, now);
   const mins = (ms) => Math.round(ms / 60000);
-  const side = leftMs && rightMs ? 'both' : rightMs ? 'right' : 'left';
+  const l = mins(leftMs), r = mins(rightMs);
+  const side = l && r ? 'both' : r > l || (!l && !r && rightMs > leftMs) ? 'right' : 'left';
   const ev = { id: uid(), type: 'feed', method: 'breast', start: n.start, side, minutes: Math.max(1, mins(totalMs)), note: '' };
   if (side === 'both') { ev.leftMin = mins(leftMs); ev.rightMin = mins(rightMs); }
   return ev;
@@ -238,7 +247,9 @@ export function buildTips(state, now = Date.now()) {
   const trackedBefore = ev.some((e) => e.type === 'diaper' && e.start < now - DAY);
   if (days != null && days > 7 && trackedBefore && last24.wet < 6 && months < 12) {
     tips.push({ tone: 'warn', icon: '💧', title: `${last24.wet} wet diaper${last24.wet === 1 ? '' : 's'} logged in the last 24 hours`,
-      text: 'After the first week, around 6 or more wet diapers a day is typical. If some simply were not logged, ignore this. If the count is right, offer extra feeds and check in with your doctor.' });
+      text: last24.wet <= 2
+        ? 'After the first week, around 6 or more wet diapers a day is typical. If some simply were not logged, ignore this. If the count is right, this is very few: offer a feed now and call your doctor or an out-of-hours service today. A dry diaper for 8 hours or more, a sunken soft spot, no tears, or unusual sleepiness needs urgent care.'
+        : 'After the first week, around 6 or more wet diapers a day is typical. If some simply were not logged, ignore this. If the count is right, offer extra feeds and speak to your doctor today.' });
   }
   if (last24.spitups >= 5) {
     tips.push({ tone: 'warn', icon: '🤮', title: `${last24.spitups} spit-ups in the last 24 hours`,
@@ -248,13 +259,15 @@ export function buildTips(state, now = Date.now()) {
   // Sleep: average over the last 3 full days that have sleep logged.
   const range = sleepRange(months);
   if (range) {
-    const today = dayStart(now);
-    const totals = [1, 2, 3].map((i) => sleepWithin(ev, today - i * DAY, today - (i - 1) * DAY, now) / HOUR).filter((h) => h > 0);
+    const totals = [1, 2, 3].map((i) => sleepWithin(ev, addDays(now, -i), addDays(now, -i + 1), now) / HOUR).filter((h) => h > 0);
     if (totals.length >= 2) {
       const avg = totals.reduce((a, b) => a + b, 0) / totals.length;
       if (avg < range[0] - 1.5) {
         tips.push({ icon: '😴', title: `About ${avg.toFixed(1)} hours of sleep a day lately`,
           text: `Babies this age typically sleep ${range[0]} to ${range[1]} hours in 24 hours, naps included. An earlier bedtime or an extra nap may help. Every baby differs, and unlogged naps will lower this number.` });
+      } else if (avg > range[1] + 2) {
+        tips.push({ icon: '😴', title: `About ${avg.toFixed(1)} hours of sleep a day logged`,
+          text: `That is more than the typical ${range[0]} to ${range[1]} hours for this age. Check for a sleep that was never ended in the log. If ${name} really is sleeping much more than usual, is hard to wake, or is feeding less, call your doctor.` });
       } else if (avg < range[0]) {
         tips.push({ icon: '😴', title: `About ${avg.toFixed(1)} hours of sleep a day lately`,
           text: `That is a little under the typical ${range[0]} to ${range[1]} hours for this age. Unlogged naps will lower the number, and babies vary.` });
@@ -313,7 +326,7 @@ export function buildTips(state, now = Date.now()) {
   // Gear for the coming stage
   if (months != null) {
     const have = new Set(state.gear.map((g) => g.name.trim().toLowerCase()));
-    const soon = GEAR_IDEAS.filter((g) => g.fromMonths <= months + 1.5 && g.fromMonths >= months - 3 && !have.has(g.name.toLowerCase())).slice(0, 3);
+    const soon = GEAR_IDEAS.filter((g) => g.fromMonths <= months + 1.5 && g.fromMonths >= months - 3 && (g.toMonths == null || months <= g.toMonths) && !have.has(g.name.toLowerCase())).slice(0, 3);
     if (soon.length) tips.push({ icon: '🛒', title: 'Gear for this stage', text: `Worth considering: ${soon.map((g) => g.name).join(', ')}. Add them to your Gear list to buy later.` });
   }
 
@@ -329,11 +342,10 @@ export function aiSummary(state, now = Date.now()) {
   const lines = [];
   const b = state.baby;
   lines.push(`Baby: ${b.name || 'unnamed'}${b.birthDate ? `, ${ageLabel(b.birthDate, now)} (born ${b.birthDate})` : ', age unknown'}.`);
-  const today = dayStart(now);
   lines.push('Daily log, most recent first (milk feeds / bottle volume / breastfeeding minutes / solid meals / sleep hours / wet / dirty / spit-ups):');
   let any = false;
   for (let i = 0; i < 7; i++) {
-    const from = today - i * DAY, s = summarize(state.events, from, from + DAY, now);
+    const from = addDays(now, -i), s = summarize(state.events, from, addDays(now, -i + 1), now);
     if (!s.feeds && !s.sleepMs && !s.wet && !s.dirty && !s.spitups) continue;
     any = true;
     lines.push(`- ${i === 0 ? 'today so far' : toDateInput(from)}: ${s.milkFeeds} milk feeds / ${fmtVolume(s.bottleMl, u)} / ${s.breastMin} min / ${s.solids} solids / ${(s.sleepMs / HOUR).toFixed(1)} h / ${s.wet} wet / ${s.dirty} dirty / ${s.spitups} spit-ups`);
@@ -341,13 +353,15 @@ export function aiSummary(state, now = Date.now()) {
   if (!any) lines.push('- nothing logged in the last 7 days');
   const growth = [...state.growth].sort((a, b2) => b2.date.localeCompare(a.date)).slice(0, 4);
   if (growth.length) lines.push('Growth (latest first): ' + growth.map((g) => `${g.date}: ${[g.weightKg ? fmtWeight(g.weightKg, u) : '', g.heightCm ? fmtHeight(g.heightCm, u) : ''].filter(Boolean).join(', ')}`).join('; ') + '.');
-  if (state.foods.length) lines.push('Foods tried: ' + state.foods.map((f) => `${f.name}${f.reaction ? ` (${f.reaction})` : ''}${f.allergy ? ' [possible reaction noted]' : ''}`).join(', ') + '.');
+  if (state.foods.length) lines.push('Foods tried: ' + recent(state.foods, 40).map((f) => `${f.name}${f.reaction ? ` (${f.reaction})` : ''}${f.allergy ? ' [possible reaction noted]' : ''}`).join(', ') + '.');
   else lines.push('Foods tried: none yet.');
-  if (state.words.length) lines.push('Words so far: ' + state.words.map((w) => w.word).join(', ') + '.');
+  if (state.words.length) lines.push(`Words so far (${state.words.length}): ` + recent(state.words, 25).map((w) => w.word).join(', ') + '.');
   const played = (state.activityLog || []).filter((a) => now - parseDate(a.date) < 7 * DAY).map((a) => a.name);
   if (played.length) lines.push('Activities done in the last 7 days: ' + [...new Set(played)].join(', ') + '.');
-  const toBuy = state.gear.filter((g) => !g.bought).map((g) => g.name), owned = state.gear.filter((g) => g.bought).map((g) => g.name);
+  const toBuy = state.gear.filter((g) => !g.bought).map((g) => g.name).slice(0, 20), owned = state.gear.filter((g) => g.bought).map((g) => g.name).slice(0, 20);
   if (toBuy.length) lines.push('Gear wishlist: ' + toBuy.join(', ') + '.');
   if (owned.length) lines.push('Gear already owned: ' + owned.join(', ') + '.');
-  return lines.join('\n');
+  return lines.join('\n').slice(0, 5000); // the AI server refuses summaries over 6000 characters
 }
+/** The most recent `count` dated items. */
+const recent = (items, count) => [...items].sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, count);

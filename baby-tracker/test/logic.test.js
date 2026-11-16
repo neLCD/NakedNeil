@@ -159,3 +159,28 @@ test('a play idea is suggested when nothing has been done for 3 days', () => {
   assert.ok(!L.buildTips(s, NOW).some((t) => /^Play idea/.test(t.title)));
   assert.match(L.aiSummary(s, NOW), /Activities done in the last 7 days: Peekaboo/);
 });
+
+test('QA round: open sleeps are capped, extremes get no "on track", and odd inputs behave', () => {
+  // an unended sleep from 3 days ago must not read as 24 h a day
+  const s = blank();
+  s.events.push({ id: 'open', type: 'sleep', start: at(2026, 11, 11, 20), end: null });
+  assert.equal(L.sleepWithin(s.events, at(2026, 11, 11), at(2026, 11, 15), NOW), L.MAX_OPEN_SLEEP);
+  assert.ok(!L.buildTips(s, NOW).some((t) => /on track/.test(t.title)));
+  const lots = blank();
+  for (let d = 1; d <= 3; d++) lots.events.push({ id: `s${d}`, type: 'sleep', start: at(2026, 11, 14 - d, 0), end: at(2026, 11, 14 - d, 20) });
+  assert.match(L.buildTips(lots, NOW).find((t) => t.icon === '😴').text, /more than the typical/);
+
+  // very few wet diapers gets the urgent wording
+  const dry = blank(); dry.baby.birthDate = '2026-10-31';
+  dry.events.push({ id: 'a', type: 'diaper', kind: 'pee', start: NOW - 3 * L.DAY });
+  assert.match(L.buildTips(dry, NOW).find((t) => /wet diaper/.test(t.title)).text, /today/);
+
+  assert.equal(L.fmtWeightChange(0.9996, 'metric'), '+1 kg');
+  const t0 = at(2026, 11, 14, 9), ev = L.nursingToFeed({ start: t0, side: 'right', sideStart: t0 + 20000, leftMs: 20000, rightMs: 0 }, t0 + 20000 + 10 * 60000);
+  assert.equal(ev.side, 'right'); // 20 s on the left is not "L 0 · R 10"
+  assert.equal(ev.leftMin, undefined);
+
+  const big = blank();
+  for (let i = 0; i < 200; i++) { big.words.push({ id: `w${i}`, word: `word${i}`, date: '2026-11-01' }); big.foods.push({ id: `f${i}`, name: `food number ${i}`, date: '2026-11-01' }); big.gear.push({ id: `g${i}`, name: `gear item ${i}`, bought: i % 2 === 0 }); }
+  assert.ok(L.aiSummary(big, NOW).length <= 5000);
+});

@@ -17,6 +17,7 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import com.google.android.gms.cast.MediaInfo;
 import com.google.android.gms.cast.MediaLoadRequestData;
 import com.google.android.gms.cast.MediaMetadata;
+import com.google.android.gms.cast.MediaStatus;
 import com.google.android.gms.cast.framework.CastContext;
 import com.google.android.gms.cast.framework.CastSession;
 import com.google.android.gms.cast.framework.SessionManagerListener;
@@ -29,10 +30,31 @@ import com.google.android.gms.cast.framework.media.RemoteMediaClient;
 @CapacitorPlugin(name = "WhiteNoise")
 public class WhiteNoisePlugin extends Plugin implements NoiseService.Listener, SessionManagerListener<CastSession> {
     private CastContext castContext;
+    private RemoteMediaClient watched; // the speaker connection whose status we are following
+    private boolean heard;             // the speaker has actually started playing our stream
+    private int reloads;               // automatic retries after a stream error
 
     @Override
     public void load() {
         NoiseService.listener = this;
+    }
+
+    /** The activity is going away: let go of everything that points back at this plugin. */
+    @Override
+    protected void handleOnDestroy() {
+        if (NoiseService.listener == this) NoiseService.listener = null;
+        try {
+            unwatch();
+            if (castContext != null) castContext.getSessionManager().removeSessionManagerListener(this, CastSession.class);
+        } catch (Exception ignored) { }
+        castContext = null;
+        super.handleOnDestroy();
+    }
+
+    private void stopService() {
+        try {
+            getContext().startService(new Intent(getContext(), NoiseService.class).setAction(NoiseService.ACTION_STOP));
+        } catch (Exception ignored) { } // the service is not running, or the app is in the background: nothing to stop
     }
 
     /** Main thread only. Returns null when Google Play services or Cast are unavailable. */
@@ -111,9 +133,7 @@ public class WhiteNoisePlugin extends Plugin implements NoiseService.Listener, S
     @PluginMethod
     public void stop(PluginCall call) {
         getActivity().runOnUiThread(() -> {
-            try {
-                getContext().startService(new Intent(getContext(), NoiseService.class).setAction(NoiseService.ACTION_STOP));
-            } catch (Exception ignored) { }
+            stopService();
             JSObject o = state();
             o.put("playing", false);
             call.resolve(o);
@@ -161,8 +181,8 @@ public class WhiteNoisePlugin extends Plugin implements NoiseService.Listener, S
         getActivity().runOnUiThread(() -> {
             try {
                 if (castContext != null) castContext.getSessionManager().endCurrentSession(true);
-                getContext().startService(new Intent(getContext(), NoiseService.class).setAction(NoiseService.ACTION_STOP));
             } catch (Exception ignored) { }
+            stopService();
             call.resolve();
         });
     }
@@ -183,7 +203,7 @@ public class WhiteNoisePlugin extends Plugin implements NoiseService.Listener, S
         }
         RemoteMediaClient client = s.getRemoteMediaClient();
         if (client == null) return;
-        String url = "http://" + NoiseService.host + ":" + NoiseService.port + "/noise.wav?t=" + System.currentTimeMillis();
+        String url = "http://" + NoiseService.host + ":" + NoiseService.port + "/" + NoiseService.token + "/noise.wav";
         MediaMetadata metadata = new MediaMetadata(MediaMetadata.MEDIA_TYPE_MUSIC_TRACK);
         metadata.putString(MediaMetadata.KEY_TITLE, "White noise");
         metadata.putString(MediaMetadata.KEY_ARTIST, "TinyLog");
@@ -192,16 +212,62 @@ public class WhiteNoisePlugin extends Plugin implements NoiseService.Listener, S
             .setContentType("audio/wav")
             .setMetadata(metadata)
             .build();
+        watch(client);
+        heard = false;
         client.load(new MediaLoadRequestData.Builder().setMediaInfo(info).setAutoplay(true).build());
+    }
+
+    /** Follows the speaker's playback, so a stalled stream is retried and a stop at the speaker is noticed. */
+    private final RemoteMediaClient.Callback speakerStatus = new RemoteMediaClient.Callback() {
+        @Override
+        public void onStatusUpdated() {
+            RemoteMediaClient client = watched;
+            if (client == null || !NoiseService.running || !NoiseService.castMode) return;
+            int playerState = client.getPlayerState();
+            if (playerState == MediaStatus.PLAYER_STATE_PLAYING || playerState == MediaStatus.PLAYER_STATE_BUFFERING) {
+                heard = true;
+                return;
+            }
+            if (playerState != MediaStatus.PLAYER_STATE_IDLE || !heard) return; // ignore states left over from before our load
+            int reason = client.getIdleReason();
+            if (reason == MediaStatus.IDLE_REASON_ERROR && reloads < 3) {
+                reloads++;
+                loadOnSpeaker(); // a Wi-Fi blip: ask the speaker to pick the stream up again
+            } else if (reason == MediaStatus.IDLE_REASON_ERROR || reason == MediaStatus.IDLE_REASON_CANCELED || reason == MediaStatus.IDLE_REASON_FINISHED) {
+                stopService(); // stopped at the speaker, or it will not recover: do not claim to be playing
+            }
+        }
+    };
+
+    private void watch(RemoteMediaClient client) {
+        if (watched == client) return;
+        unwatch();
+        watched = client;
+        client.registerCallback(speakerStatus);
+    }
+
+    private void unwatch() {
+        try { if (watched != null) watched.unregisterCallback(speakerStatus); } catch (Exception ignored) { }
+        watched = null;
     }
 
     // ---------- NoiseService.Listener (called on the main thread) ----------
     @Override
     public void onNoiseState() {
-        // The timer ran out, or Stop was pressed in the notification, while casting: release the speaker too.
-        if (!NoiseService.running && session() != null) {
-            try { castContext.getSessionManager().endCurrentSession(true); } catch (Exception ignored) { }
+        CastSession s = session();
+        if (!NoiseService.running && s != null) {
+            try {
+                if (NoiseService.stoppedByTimer) {
+                    // The sleep timer ran out with nobody watching: release the speaker completely.
+                    castContext.getSessionManager().endCurrentSession(true);
+                } else {
+                    // Stop pressed: silence the speaker but stay connected, so Play goes to it again.
+                    RemoteMediaClient client = s.getRemoteMediaClient();
+                    if (client != null) client.stop();
+                }
+            } catch (Exception ignored) { }
         }
+        if (!NoiseService.running) reloads = 0;
         emit();
     }
 
@@ -212,20 +278,23 @@ public class WhiteNoisePlugin extends Plugin implements NoiseService.Listener, S
 
     // ---------- Cast session events (main thread) ----------
     private void onConnected() {
+        reloads = 0;
         if (NoiseService.running) {
             // Move what is playing from the phone to the speaker, keeping the timer.
-            startService(NoiseService.type, NoiseService.endsAt, NoiseService.volume, true);
+            try {
+                startService(NoiseService.type, NoiseService.endsAt, NoiseService.volume, true);
+            } catch (Exception e) {
+                // Android refuses to start a foreground service while the app is in the background.
+                stopService();
+            }
         }
         emit();
     }
 
     private void onDisconnected() {
         // Never fall back to the phone's own speaker by surprise: stop instead.
-        if (NoiseService.running && NoiseService.castMode) {
-            try {
-                getContext().startService(new Intent(getContext(), NoiseService.class).setAction(NoiseService.ACTION_STOP));
-            } catch (Exception ignored) { }
-        }
+        unwatch();
+        if (NoiseService.running && NoiseService.castMode) stopService();
         emit();
     }
 

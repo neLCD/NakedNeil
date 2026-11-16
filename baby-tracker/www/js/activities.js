@@ -16,7 +16,7 @@ export const ACTIVITY_BANDS = [
 export const ACTIVITIES = [
   // 0 to 3 months
   { id: 'tummy-chest', from: 0, to: 3, icon: '🤱', name: 'Tummy time on your chest', area: 'move', minutes: 3,
-    how: 'Lie back and place baby tummy-down on your chest so they lift their head to find your face. A few short sessions a day, only while awake and watched.' },
+    how: 'Lie back and place baby tummy-down on your chest so they lift their head to find your face. A few short sessions a day, only while you are both wide awake. If you feel sleepy, put baby on their back in the cot.' },
   { id: 'face-time', from: 0, to: 3, icon: '😊', name: 'Face to face', area: 'bond', minutes: 5,
     how: 'Hold baby about 20 to 30 cm from your face. Smile, stick out your tongue, raise your eyebrows, and pause so they can copy.' },
   { id: 'contrast-cards', from: 0, to: 3, icon: '🏁', name: 'Black and white pictures', area: 'senses', minutes: 5,
@@ -35,7 +35,7 @@ export const ACTIVITIES = [
   { id: 'sing-actions', from: 3, to: 6, icon: '🎶', name: 'Songs with actions', area: 'talk', minutes: 5,
     how: 'Sing simple songs and move baby’s hands or bounce gently in time. Repeat favourites; repetition is how they learn.' },
   { id: 'textures', from: 3, to: 6, icon: '🧶', name: 'Feel different textures', area: 'senses', minutes: 5,
-    how: 'Let baby touch a soft towel, a crinkly wrapper, a smooth spoon. Name each one: soft, crinkly, cold.' },
+    how: 'Let baby touch a soft towel, a crinkly baby toy or clean fabric, a smooth spoon. Name each one: soft, crinkly, cold. Never plastic bags, film or foil.' },
   // 6 to 9 months
   { id: 'peekaboo', from: 6, to: 9, icon: '🙈', name: 'Peekaboo', area: 'think', minutes: 5,
     how: 'Hide your face behind your hands or a cloth and reappear. Later, hide a toy under a cloth and let baby find it.' },
@@ -46,7 +46,7 @@ export const ACTIVITIES = [
   { id: 'book-look', from: 6, to: 9, icon: '📖', name: 'Look at a book together', area: 'talk', minutes: 5,
     how: 'Choose a sturdy board book. Point at pictures and name them. Let baby turn pages and chew the corners.' },
   { id: 'roll-ball', from: 6, to: 9, icon: '⚽', name: 'Roll a ball', area: 'move', minutes: 5,
-    how: 'Roll a soft ball towards baby and encourage them to push it back. Good for early crawling attempts too.' },
+    how: 'Roll a soft ball, too big to fit in the mouth, towards baby and encourage them to push it back. Good for early crawling attempts too.' },
   // 9 to 12 months
   { id: 'container-play', from: 9, to: 12, icon: '🧺', name: 'Fill and empty', area: 'think', minutes: 10,
     how: 'Give a basket and safe objects too large to swallow. Putting in and tipping out can last a surprisingly long time.' },
@@ -57,7 +57,7 @@ export const ACTIVITIES = [
   { id: 'stack-knock', from: 9, to: 12, icon: '🧱', name: 'Build it, knock it down', area: 'think', minutes: 10,
     how: 'Stack two or three blocks or cups and let baby knock them over. Then hand them one to add.' },
   { id: 'finger-food-play', from: 9, to: 12, icon: '🫐', name: 'Pincer practice', area: 'move', minutes: 10,
-    how: 'At mealtime, offer small soft pieces of food on the tray so baby practises picking up with finger and thumb.' },
+    how: 'At mealtime, with baby seated upright, offer small soft pieces of food on the tray to pick up with finger and thumb. Squash or quarter anything round, such as blueberries, and stay with them.' },
   // 12 to 18 months
   { id: 'push-walk', from: 12, to: 18, icon: '🚶', name: 'Push and walk', area: 'move', minutes: 10,
     how: 'A sturdy push toy or a weighted box to push across the room builds balance. Clear the path and stay near.' },
@@ -84,6 +84,6 @@ export const ACTIVITIES = [
 
 /** The band that fits an age in months (falls back to the first band when age is unknown). */
 export function bandFor(months) {
-  if (months == null) return ACTIVITY_BANDS[0];
+  if (months == null || months < 0) return ACTIVITY_BANDS[0];
   return ACTIVITY_BANDS.find((b) => months >= b.from && months < b.to) || ACTIVITY_BANDS[ACTIVITY_BANDS.length - 1];
 }

@@ -1,50 +1,38 @@
 // The app's data and where the parent is in the app. All data lives on the device
 // (localStorage); nothing leaves it unless the parent asks the AI a question.
 import * as L from './logic.js';
-import { toast, render } from './ui.js';
+import { render } from './ui.js';
+import { blank, normalise } from './schema.js';
 
 // ---------- saved data ----------
 const KEY = 'tinylog.v1';
-const blank = () => ({
-  baby: { name: '', birthDate: '' },
-  settings: { units: 'metric', currency: '$', aiUrl: '' },
-  events: [], growth: [], words: [], foods: [], gear: [],
-  nursing: null, // breastfeeding timer in progress, see logic.js
-  activityLog: [], // { id, activityId, name, date } each time an activity is marked done
-});
-function normalise(data) {
-  const b = blank();
-  if (!data || typeof data !== 'object') return b;
-  return {
-    baby: { ...b.baby, ...(data.baby || {}) },
-    settings: { ...b.settings, ...(data.settings || {}) },
-    events: Array.isArray(data.events) ? data.events.filter((e) => e && e.id && e.type && Number.isFinite(e.start)) : [],
-    growth: Array.isArray(data.growth) ? data.growth.filter((g) => g && g.id && g.date) : [],
-    words: Array.isArray(data.words) ? data.words.filter((w) => w && w.id && w.word) : [],
-    foods: Array.isArray(data.foods) ? data.foods.filter((f) => f && f.id && f.name) : [],
-    gear: Array.isArray(data.gear) ? data.gear.filter((g) => g && g.id && g.name) : [],
-    nursing: data.nursing && Number.isFinite(data.nursing.start) ? data.nursing : null,
-    activityLog: Array.isArray(data.activityLog) ? data.activityLog.filter((a) => a && a.activityId && a.date) : [],
-  };
-}
 function load() { try { return normalise(JSON.parse(localStorage.getItem(KEY))); } catch { return blank(); } }
 
 /** Everything that is saved. Importers see the new object after replaceState/resetState. */
 export let state = load();
-/** Store the current state and redraw. Call after every change to `state`. */
+/**
+ * Store the current state and redraw. Call after every change to `state`.
+ * Returns false when the phone refused the write; the shell then shows a warning that
+ * stays on screen until a save works, so a later "logged" message cannot hide it.
+ */
 export function save() {
-  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { toast('Could not save. Storage may be full.'); }
+  let ok = true;
+  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { ok = false; }
+  view.saveFailed = !ok;
   render();
+  return ok;
 }
 /** Swap in data from a backup (cleaned up first). Follow with save(). */
 export function replaceState(data) { state = normalise(data); }
 /** Wipe everything. Follow with save(). */
-export function resetState() { state = blank(); view.ai = { busy: false, answer: '', error: '', question: '' }; }
+export function resetState() { state = blank(); view.ai = { busy: false, answer: '', error: '', question: '', draft: '' }; view.tab = 'today'; view.day = null; }
 export const units = () => state.settings.units;
 
 // ---------- where the parent is (not saved) ----------
 export const view = {
   tab: 'today',
+  saveFailed: false, // the last save did not reach storage
+  tapGuard: 0, // ignore quick-log taps until this time (just after a card under the finger disappears)
   day: null, // the day shown on Today; null means "today", see viewDay
   welcome: { name: '', birthDate: '' },
   trends: 'daily', trend: { metric: 'sleep', days: 7 },

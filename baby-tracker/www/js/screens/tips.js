@@ -14,18 +14,31 @@ async function askAi(question) {
   if (!q || view.ai.busy) return;
   view.ai = { busy: true, answer: '', error: '', question: q, draft: '' };
   render();
+  const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), 60000); // never "Thinking…" forever
   try {
     const res = await fetch(`${aiUrl()}/suggest`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctrl.signal,
       body: JSON.stringify({ question: q, summary: L.aiSummary(state) }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || `The AI service returned an error (${res.status}).`);
-    view.ai = { busy: false, answer: String(data.text || ''), error: '', question: q };
+    const text = typeof data.text === 'string' ? data.text.trim() : '';
+    if (!text) throw new Error('The AI service sent back an empty answer. Please try again.');
+    view.ai = { busy: false, answer: text, error: '', question: q, draft: '' };
   } catch (err) {
-    view.ai = { busy: false, answer: '', question: q, error: err instanceof TypeError ? 'Could not reach the AI service. Check your connection and the address in Settings.' : err.message };
-  }
+    const message = err.name === 'AbortError' ? 'The AI service took too long to answer. Please try again.'
+      : err instanceof TypeError ? 'Could not reach the AI service. Check your connection and the address in Settings.' : err.message;
+    view.ai = { busy: false, answer: '', question: q, error: message, draft: q };
+  } finally { clearTimeout(timer); }
   render();
+}
+/** Lets a parent flag an answer that seems wrong or unsafe (sent to the AI server's log). */
+async function reportAnswer() {
+  const { question, answer } = view.ai;
+  view.ai.reported = true; render();
+  try {
+    await fetch(`${aiUrl()}/report`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question, answer }) });
+  } catch { /* the thanks still shows; there is nothing useful the parent can do about a failed report */ }
 }
 
 export function viewTips() {
@@ -37,7 +50,9 @@ export function viewTips() {
       h('form', { onsubmit: (e) => { e.preventDefault(); askAi(input.value); } }, input,
         h('button', { class: 'btn primary block', type: 'submit', disabled: view.ai.busy }, view.ai.busy ? 'Thinking…' : 'Ask')),
       view.ai.error && h('p', { class: 'warnbox', role: 'alert' }, view.ai.error),
-      view.ai.answer && h('div', { class: 'answer', role: 'status' }, h('small', null, view.ai.question), h('p', null, view.ai.answer)),
+      view.ai.answer && h('div', { class: 'answer', role: 'status' }, h('small', null, view.ai.question), h('p', null, view.ai.answer),
+        view.ai.reported ? h('small', null, 'Thanks. This answer has been reported.')
+          : h('button', { class: 'linkish small', type: 'button', onclick: reportAnswer }, 'Report a problem with this answer')),
       h('p', { class: 'fine' }, 'Asking sends a summary of the last 7 days of logs, plus growth, foods, words, activities and gear, to the AI service. Answers are general information, not medical advice.')),
     h('section', { class: 'card' }, h('h2', null, 'Tips for right now'),
       h('ul', { class: 'tips' }, tips.map((t) => h('li', { class: t.tone || '' }, h('i', null, t.icon), h('span', null, h('b', null, t.title), h('small', null, t.text))))),
