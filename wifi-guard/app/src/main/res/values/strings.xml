@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">WiFi Guard</string>
+    <string name="accessibility_label">WiFi Guard browser blocker</string>
+    <string name="accessibility_description">Closes web browsers whenever the phone is using mobile data instead of Wi-Fi. It only checks which app is in front; it does not read or store what is on screen.</string>
+</resources>
