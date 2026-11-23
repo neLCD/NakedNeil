@@ -42,7 +42,7 @@ export function viewFirsts() {
   const tabs = seg([['words', 'Words'], ['foods', 'Foods']], view.firsts, (v) => { view.firsts = v; render(); });
   if (view.firsts === 'words') {
     return [tabs, h('section', { class: 'card' },
-      h('button', { class: 'btn primary block', type: 'button', onclick: () => wordSheet() }, '+ Add a word'),
+      h('button', { class: 'btn tonal block', type: 'button', onclick: () => wordSheet() }, '+ Add a word'),
       state.words.length ? h('ul', { class: 'list' }, [...state.words].sort(byDate).map((w) => h('li', null, h('button', { type: 'button', onclick: () => wordSheet(w) },
         h('i', { class: 'ico' }, icon('bubble', 20)), h('span', { class: 'grow' }, h('b', null, `“${w.word}”`), h('small', null, [age(w.date), w.note].filter(Boolean).join(' · '))),
         h('time', null, fmtDate(L.parseDate(w.date), true))))))
@@ -51,7 +51,7 @@ export function viewFirsts() {
   const emoji = { loved: '😍', ok: '🙂', disliked: '😖' };
   return [tabs,
     h('section', { class: 'card' },
-      h('button', { class: 'btn primary block', type: 'button', onclick: () => foodSheet() }, '+ Add a first food'),
+      h('button', { class: 'btn tonal block', type: 'button', onclick: () => foodSheet() }, '+ Add a first food'),
       state.foods.length ? h('ul', { class: 'list' }, [...state.foods].sort(byDate).map((f) => h('li', null, h('button', { type: 'button', onclick: () => foodSheet(f) },
         h('i', { class: 'ico' }, emoji[f.reaction] || icon('bowl', 20)),
         h('span', { class: 'grow' }, h('b', null, f.name, f.allergy && h('span', { class: 'tag warn' }, '⚠ reaction')), h('small', null, [age(f.date), f.note].filter(Boolean).join(' · '))),
