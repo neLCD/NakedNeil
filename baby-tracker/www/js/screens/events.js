@@ -80,7 +80,9 @@ function amountStepper(d) {
   const step = units() === 'imperial' ? 0.5 : 10;
   const box = h('input', { type: 'number', inputMode: 'decimal', min: 0, step: 'any', value: d.amount ?? '', 'aria-label': 'Amount', oninput: (e) => { d.amount = e.target.value; } });
   const nudge = (dir) => {
-    const next = Math.max(0, Math.round(((num(d.amount) ?? 0) + dir * step) / step) * step);
+    // snap to the next step in that direction: 165 ml -> 170 with +, 160 with -
+    const v = num(d.amount) ?? 0, k = v / step;
+    const next = Math.max(0, (dir > 0 ? Math.floor(k + 1e-9) + 1 : Math.ceil(k - 1e-9) - 1) * step);
     d.amount = String(+next.toFixed(1)); box.value = d.amount;
   };
   return h('div', { class: 'stepper' },
