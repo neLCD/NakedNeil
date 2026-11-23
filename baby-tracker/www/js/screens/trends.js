@@ -34,14 +34,14 @@ function viewDaily() {
         stat('Dirty', avg((d) => d.dirty)),
         stat('Spit-ups', avg((d) => d.spitups))),
       h('p', { class: 'fine' }, 'Averages use full days that have something logged. Today is left out until it is over.')),
-    h('section', { class: 'card' },
-      seg(Object.entries(TREND).map(([k, v]) => [k, v.label]), view.trend.metric, (v) => { view.trend.metric = v; render(); }),
+    h('section', { class: `card m-${view.trend.metric}` },
+      seg(Object.entries(TREND).map(([k, v]) => [k, v.label]), view.trend.metric, (v) => { view.trend.metric = v; render(); }, 'chiptabs'),
       any ? [
         t.series.length > 1 && h('div', { class: 'legend' }, t.series.map((sr) => h('span', null, h('i', { class: `sw ${sr.cls}` }), sr.name))),
         barChart({ days, series: t.series, unit: t.unit, fmtValue: t.fmt, ariaLabel: `${t.label} per day for the last ${n} days`,
           band: view.trend.metric === 'sleep' ? L.sleepRange(L.ageMonths(state.baby.birthDate)) : null }),
       ] : h('p', { class: 'empty' }, `No ${t.label.toLowerCase()} logged in the last ${n} days.`)),
-    h('section', { class: 'card' }, h('h2', null, 'Day pattern, last 7 days'),
+    h('section', { class: 'card m-pattern' }, h('h2', null, 'Day pattern, last 7 days'),
       h('div', { class: 'legend' }, h('span', null, h('i', { class: 'sw s1' }), 'Asleep'), h('span', null, h('i', { class: 'sw dot' }), 'Feed')),
       patternChart({
         ariaLabel: 'Sleep and feed times across each of the last 7 days',

@@ -47,7 +47,7 @@ export function viewGrowth() {
     const diff = list[list.length - 1][key] - list[list.length - 2][key];
     return `${fmt(diff)} since last`;
   };
-  const chart = (list, title, toValue, unit, fmt) => list.length > 0 && h('section', { class: 'card' },
+  const chart = (list, title, toValue, unit, fmt) => list.length > 0 && h('section', { class: 'card m-growth' },
     h('h2', null, title),
     list.length === 1 ? h('p', { class: 'empty' }, `${fmt(list[0])} on ${fmtDate(L.parseDate(list[0].date), true)}. Add another measurement to see a trend line.`)
       : lineChart({
@@ -59,7 +59,7 @@ export function viewGrowth() {
       h('div', { class: 'stats two' },
         stat('Weight', weights.length ? L.fmtWeight(weights[weights.length - 1].weightKg, u) : '—', delta(weights, 'weightKg', (v) => L.fmtWeightChange(v, u))),
         stat('Height', heights.length ? L.fmtHeight(heights[heights.length - 1].heightCm, u) : '—', delta(heights, 'heightCm', (v) => `${v >= 0 ? '+' : '−'}${L.fmtHeight(Math.abs(v), u)}`))),
-      h('button', { class: 'btn primary block', type: 'button', onclick: () => growthSheet() }, '+ Add measurement')),
+      h('button', { class: 'btn tonal block', type: 'button', onclick: () => growthSheet() }, '+ Add measurement')),
     chart(weights, 'Weight over time', (g) => L.weightValue(g.weightKg, u), L.weightUnit(u), (g) => L.fmtWeight(g.weightKg, u)),
     chart(heights, 'Height over time', (g) => L.heightValue(g.heightCm, u), L.heightUnit(u), (g) => L.fmtHeight(g.heightCm, u)),
     rows.length > 0 && h('section', { class: 'card' }, h('h2', null, 'All measurements'),
