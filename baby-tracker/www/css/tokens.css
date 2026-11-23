@@ -1,0 +1,103 @@
+/* TinyLog design system: tokens only (no component rules).
+   Light is the default; dark follows the phone, or data-theme="dark" forces it. */
+
+@font-face {
+  font-family: "Figtree";
+  src: url("../fonts/Figtree-Variable.ttf") format("truetype");
+  font-weight: 300 900;
+  font-display: swap;
+}
+
+:root {
+  /* ---- type ---- */
+  --font-display: "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --fs-hero: 44px;   /* live timer */
+  --fs-xl: 30px;     /* glanceable figures */
+  --fs-lg: 22px;     /* screen / baby name */
+  --fs-md: 17px;     /* card titles, list titles */
+  --fs-base: 15.5px; /* body */
+  --fs-sm: 13.5px;   /* labels, meta */
+  --fs-xs: 12px;     /* axis, captions */
+
+  /* ---- space (4-based) ---- */
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 20px; --s6: 24px; --s8: 32px;
+
+  /* ---- shape ---- */
+  --r-sm: 12px; --r-md: 16px; --r-lg: 22px; --r-xl: 28px; --r-pill: 999px;
+
+  /* ---- motion ---- */
+  --dur-fast: 150ms; --dur: 220ms; --ease: cubic-bezier(.2, .8, .2, 1);
+
+  /* ---- surfaces and text (light) ---- */
+  --bg: #f8f5f2;
+  --surface: #ffffff;
+  --surface-2: #f2ede8;     /* fields, tracks, quiet buttons */
+  --surface-3: #e9e2dc;
+  --ink: #1d1923;
+  --ink-2: #6a6271;
+  --ink-3: #9a929f;
+  --line: #ebe4de;
+  --shadow-1: 0 1px 2px rgba(40, 24, 32, .05), 0 2px 8px rgba(40, 24, 32, .04);
+  --shadow-2: 0 2px 6px rgba(40, 24, 32, .06), 0 12px 28px rgba(40, 24, 32, .08);
+  --scrim: rgba(20, 14, 20, .45);
+
+  /* ---- brand ---- */
+  --brand: #c43d66;
+  --brand-ink: #ffffff;
+  --brand-tint: #fbe6ec;
+  --brand-tint-ink: #962a4d;
+  --danger: #c22a43;
+  --warn: #fff1d6; --warn-ink: #6c4300;
+  --good: #e1f3e6; --good-ink: #22603a;
+
+  /* ---- event colours: tint (background), main (icon, chart), ink (text on tint) ---- */
+  --feed: #fdeae1;  --feed-main: #ea6a3c;  --feed-ink: #9a3d17;
+  --sleep: #ebeafd; --sleep-main: #6461de; --sleep-ink: #3d3aa6;
+  --pee: #e2f1fb;   --pee-main: #2f8fd2;   --pee-ink: #165f93;
+  --poop: #f4ebe0;  --poop-main: #ad7a45;  --poop-ink: #6e4b22;
+  --spit: #e4f2e7;  --spit-main: #4e9a65;  --spit-ink: #2c6a3e;
+  --solid: #fcf1d6; --solid-main: #d99a12; --solid-ink: #765200;
+
+  /* ---- charts ---- */
+  --grid: #eee8e3;
+  --axis: #9a929f;
+
+  --top: max(env(safe-area-inset-top), var(--safe-area-inset-top, 0px));
+  --bottom: max(env(safe-area-inset-bottom), var(--safe-area-inset-bottom, 0px));
+  color-scheme: light;
+}
+
+/* Dark: tuned for night feeds. No pure white text, low-glare surfaces, softened accents. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121116; --surface: #1c1a21; --surface-2: #26232c; --surface-3: #312d38;
+    --ink: #ece7f0; --ink-2: #aea6b6; --ink-3: #7d7686; --line: #2c2932;
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, .3); --shadow-2: 0 8px 24px rgba(0, 0, 0, .45); --scrim: rgba(0, 0, 0, .6);
+    --brand: #ec7d9b; --brand-ink: #24060f; --brand-tint: #3a1d27; --brand-tint-ink: #ffb3c6;
+    --danger: #ff8597; --warn: #3f3110; --warn-ink: #ffdc94; --good: #18341f; --good-ink: #9fdcae;
+    --feed: #3a251d;  --feed-main: #f28c66;  --feed-ink: #ffc0a6;
+    --sleep: #26254a; --sleep-main: #8f8cf2; --sleep-ink: #c3c1ff;
+    --pee: #18303f;   --pee-main: #5db2ee;   --pee-ink: #a8d8fa;
+    --poop: #352a1f;  --poop-main: #cc9c69;  --poop-ink: #ebcfaa;
+    --spit: #1c3022;  --spit-main: #74c08b;  --spit-ink: #b0e2bd;
+    --solid: #3a3015; --solid-main: #ebbb4c; --solid-ink: #f6dc94;
+    --grid: #2b2831; --axis: #7d7686;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121116; --surface: #1c1a21; --surface-2: #26232c; --surface-3: #312d38;
+  --ink: #ece7f0; --ink-2: #aea6b6; --ink-3: #7d7686; --line: #2c2932;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .3); --shadow-2: 0 8px 24px rgba(0, 0, 0, .45); --scrim: rgba(0, 0, 0, .6);
+  --brand: #ec7d9b; --brand-ink: #24060f; --brand-tint: #3a1d27; --brand-tint-ink: #ffb3c6;
+  --danger: #ff8597; --warn: #3f3110; --warn-ink: #ffdc94; --good: #18341f; --good-ink: #9fdcae;
+  --feed: #3a251d;  --feed-main: #f28c66;  --feed-ink: #ffc0a6;
+  --sleep: #26254a; --sleep-main: #8f8cf2; --sleep-ink: #c3c1ff;
+  --pee: #18303f;   --pee-main: #5db2ee;   --pee-ink: #a8d8fa;
+  --poop: #352a1f;  --poop-main: #cc9c69;  --poop-ink: #ebcfaa;
+  --spit: #1c3022;  --spit-main: #74c08b;  --spit-ink: #b0e2bd;
+  --solid: #3a3015; --solid-main: #ebbb4c; --solid-ink: #f6dc94;
+  --grid: #2b2831; --axis: #7d7686;
+  color-scheme: dark;
+}

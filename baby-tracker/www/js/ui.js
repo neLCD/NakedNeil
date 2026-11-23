@@ -80,9 +80,9 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && sheetOpe
 
 // ---------- small controls ----------
 export const field = (label, input, hint) => h('label', { class: 'field' }, h('span', null, label), input, hint && h('small', null, hint));
-/** A row of buttons where one is selected. `options` is a list of [value, label]. */
-export function seg(options, value, onChange) {
-  return h('div', { class: 'seg', role: 'group' }, options.map(([v, label]) =>
+/** A row of buttons where one is selected. `options` is a list of [value, label]. `cls` adds a style, e.g. 'chiptabs'. */
+export function seg(options, value, onChange, cls) {
+  return h('div', { class: cls ? `seg ${cls}` : 'seg', role: 'group' }, options.map(([v, label]) =>
     h('button', { type: 'button', 'aria-pressed': String(v === value), onclick: () => onChange(v) }, label)));
 }
 /** One big figure with a label, used in the rows of totals. */
