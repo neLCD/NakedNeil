@@ -38,7 +38,7 @@ export function feedSheet(existing, preset) {
       field('Minutes', h('input', { type: 'number', inputMode: 'numeric', min: 0, max: 180, value: d.minutes ?? '', oninput: (e) => { d.minutes = e.target.value; } })),
     ],
     d.method === 'bottle' && [
-      field(`Amount (${units() === 'imperial' ? 'oz' : 'ml'})`, h('input', { type: 'number', inputMode: 'decimal', min: 0, step: 'any', value: d.amount ?? '', oninput: (e) => { d.amount = e.target.value; } })),
+      field(`Amount (${units() === 'imperial' ? 'oz' : 'ml'})`, amountStepper(d)),
       field('What', seg([['Formula', 'Formula'], ['Breast milk', 'Breast milk']], d.content, (v) => { d.content = v; redraw(); })),
     ],
     d.method === 'solid' && [
@@ -73,6 +73,20 @@ export function feedSheet(existing, preset) {
     }
     upsertEvent(ev);
   }, existing && (() => removeWithUndo('events', existing)));
+}
+
+/** Bottle amount: a number box with − and + buttons (10 ml or 0.5 oz a tap). */
+function amountStepper(d) {
+  const step = units() === 'imperial' ? 0.5 : 10;
+  const box = h('input', { type: 'number', inputMode: 'decimal', min: 0, step: 'any', value: d.amount ?? '', 'aria-label': 'Amount', oninput: (e) => { d.amount = e.target.value; } });
+  const nudge = (dir) => {
+    const next = Math.max(0, Math.round(((num(d.amount) ?? 0) + dir * step) / step) * step);
+    d.amount = String(+next.toFixed(1)); box.value = d.amount;
+  };
+  return h('div', { class: 'stepper' },
+    h('button', { type: 'button', 'aria-label': `Less, ${step} ${units() === 'imperial' ? 'oz' : 'ml'}`, onclick: () => nudge(-1) }, '−'),
+    box,
+    h('button', { type: 'button', 'aria-label': `More, ${step} ${units() === 'imperial' ? 'oz' : 'ml'}`, onclick: () => nudge(1) }, '+'));
 }
 
 /** Start a sleep now. With `noise`, the white noise starts too (same sound and timer as last time). */

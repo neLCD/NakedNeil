@@ -31,28 +31,42 @@ export function viewToday() {
   const dayEvents = ev.filter((e) => (e.start >= from && e.start < to) || carried(e)).sort((a, b) => b.start - a.start);
   const milk = [s.bottleMl ? `${L.fmtVolume(s.bottleMl, units())} by bottle` : '', s.breastMin ? `${s.breastMin} min breastfeeding` : '', s.solids ? `${s.solids} solid meal${s.solids === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ');
 
+  // part of the day an entry belongs to, for the grouped timeline (list is newest first)
+  const part = (e) => { if (carried(e)) return 'Night'; const hr = new Date(e.start).getHours(); return hr < 5 ? 'Night' : hr < 12 ? 'Morning' : hr < 17 ? 'Afternoon' : 'Evening'; };
+  const timeline = [];
+  dayEvents.forEach((e, i) => {
+    const p = part(e), prev = i > 0 && part(dayEvents[i - 1]), next = i < dayEvents.length - 1 && part(dayEvents[i + 1]);
+    if (p !== prev) timeline.push(h('li', { class: 'part' }, p));
+    const d = L.describeEvent(e, units());
+    timeline.push(h('li', { class: 'ev' + (p !== prev ? ' first' : '') + (p !== next ? ' last' : '') }, h('button', { type: 'button', onclick: () => editEvent(e) },
+      eventIcon(e), h('span', { class: 'grow' }, h('b', null, d.title), (d.detail || e.note) && h('small', null, [d.detail, e.note].filter(Boolean).join(' · '))),
+      h('time', null, carried(e) ? `from ${fmtTime(e.start)} the day before` : fmtTime(e.start)))));
+  });
+
   return [
     nursingCard(),
-    h('section', { class: 'since' },
-      h('div', { class: 'chip' }, h('span', null, 'Since feed'), h('b', null, since(lastFeed))),
-      h('div', { class: 'chip' + (sleeping ? ' on' : '') }, h('span', null, sleeping ? 'Asleep for' : 'Awake for'),
-        h('b', null, sleeping ? L.fmtDuration(now - sleeping.start) : lastSleep ? L.fmtDuration(now - lastSleep.end) : '—')),
-      h('div', { class: 'chip' }, h('span', null, 'Since diaper'), h('b', null, since(lastDiaper)))),
-    h('section', { class: 'quick' },
-      h('button', { type: 'button', class: 'q t-feed', onclick: () => feedSheet() }, icon('bottle', 30), 'Feed'),
+    h('section', { class: 'card glance', 'aria-label': 'Time since last' },
+      h('div', null, h('span', { class: 'dot t-feed' }, icon('bottle', 16)), h('b', null, fig(since(lastFeed))), h('span', null, 'since feed')),
+      h('div', { class: sleeping ? 'on' : '' }, h('span', { class: 'dot t-sleep' }, icon(sleeping ? 'moon' : 'sun', 16)),
+        h('b', null, fig(sleeping ? L.fmtDuration(now - sleeping.start) : lastSleep ? L.fmtDuration(now - lastSleep.end) : '—')), h('span', null, sleeping ? 'asleep' : 'awake')),
+      h('div', null, h('span', { class: 'dot t-pee' }, icon('drop', 16)), h('b', null, fig(since(lastDiaper))), h('span', null, 'since diaper'))),
+    h('section', { class: 'quick-main' },
+      h('button', { type: 'button', class: 'q t-feed', onclick: () => feedSheet() }, h('span', { class: 'ic' }, icon('bottle', 24)), h('span', null, h('b', null, 'Feed'), h('small', null, 'Breast, bottle or solids'))),
       sleeping
-        ? h('button', { type: 'button', class: 'q t-sleep on', onclick: () => { sleeping.end = Date.now(); save(); toast(`Woke up after ${L.fmtDuration(sleeping.end - sleeping.start)}`, 'Edit', () => editEvent(sleeping)); } }, icon('sun', 30), 'Wake up')
-        : h('button', { type: 'button', class: 'q t-sleep', onclick: () => sleepSheet() }, icon('moon', 30), 'Sleep'),
-      h('button', { type: 'button', class: 'q t-pee', onclick: () => quickLog({ type: 'diaper', kind: 'pee' }, 'Pee') }, icon('drop', 30), 'Pee'),
-      h('button', { type: 'button', class: 'q t-poop', onclick: () => quickLog({ type: 'diaper', kind: 'poop' }, 'Poop') }, icon('diaper', 30), 'Poop'),
-      h('button', { type: 'button', class: 'q t-spit', onclick: () => quickLog({ type: 'spitup', amount: 'small' }, 'Spit-up') }, icon('spit', 30), 'Spit-up'),
-      h('button', { type: 'button', class: 'q t-solid', onclick: () => feedSheet(null, 'solid') }, icon('bowl', 30), 'Solids')),
+        ? h('button', { type: 'button', class: 'q t-sleep on', onclick: () => { sleeping.end = Date.now(); save(); toast(`Woke up after ${L.fmtDuration(sleeping.end - sleeping.start)}`, 'Edit', () => editEvent(sleeping)); } },
+          h('span', { class: 'ic' }, icon('sun', 24)), h('span', null, h('b', null, 'Wake up'), h('small', null, `Asleep ${L.fmtDuration(now - sleeping.start)}`)))
+        : h('button', { type: 'button', class: 'q t-sleep', onclick: () => sleepSheet() }, h('span', { class: 'ic' }, icon('moon', 24)), h('span', null, h('b', null, 'Sleep'), h('small', null, 'Start a nap or log one')))),
+    h('section', { class: 'quick-sub' },
+      h('button', { type: 'button', class: 'qs', onclick: () => quickLog({ type: 'diaper', kind: 'pee' }, 'Pee') }, h('span', { class: 'ic t-pee' }, icon('drop', 20)), 'Pee'),
+      h('button', { type: 'button', class: 'qs', onclick: () => quickLog({ type: 'diaper', kind: 'poop' }, 'Poop') }, h('span', { class: 'ic t-poop' }, icon('diaper', 20)), 'Poop'),
+      h('button', { type: 'button', class: 'qs', onclick: () => quickLog({ type: 'spitup', amount: 'small' }, 'Spit-up') }, h('span', { class: 'ic t-spit' }, icon('spit', 20)), 'Spit-up'),
+      h('button', { type: 'button', class: 'qs', onclick: () => feedSheet(null, 'solid') }, h('span', { class: 'ic t-solid' }, icon('bowl', 20)), 'Solids')),
     h('section', { class: 'card' },
       h('div', { class: 'daynav' },
-        h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Previous day', onclick: () => { view.day = L.addDays(viewDay(), -1); render(); } }, icon('back', 20)),
+        h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Previous day', onclick: () => { view.day = L.addDays(viewDay(), -1); render(); } }, icon('back', 18)),
         isToday ? h('h2', null, 'Today')
           : h('button', { class: 'dayback', type: 'button', onclick: () => { view.day = null; render(); } }, h('b', null, fmtDay(from)), h('small', null, 'Back to today')),
-        h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Next day', disabled: isToday, onclick: () => { showDay(L.addDays(viewDay(), 1)); render(); } }, icon('next', 20))),
+        h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Next day', disabled: isToday, onclick: () => { showDay(L.addDays(viewDay(), 1)); render(); } }, icon('next', 18))),
       h('div', { class: 'stats' },
         stat('Milk feeds', s.milkFeeds),
         stat('Sleep', `${+(s.sleepMs / L.HOUR).toFixed(1)}h`),
@@ -61,15 +75,12 @@ export function viewToday() {
         stat('Spit-ups', s.spitups)),
       milk && h('p', { class: 'fine center' }, milk),
       dayEvents.length
-        ? h('ul', { class: 'list' }, dayEvents.map((e) => {
-          const d = L.describeEvent(e, units());
-          return h('li', null, h('button', { type: 'button', onclick: () => editEvent(e) },
-            eventIcon(e), h('span', { class: 'grow' }, h('b', null, d.title), (d.detail || e.note) && h('small', null, [d.detail, e.note].filter(Boolean).join(' · '))),
-            h('time', null, carried(e) ? `from ${fmtTime(e.start)} the day before` : fmtTime(e.start))));
-        }))
+        ? h('ul', { class: 'list tl' }, timeline)
         : h('p', { class: 'empty' }, isToday ? 'Nothing logged yet today. Tap a button above to start.' : 'Nothing was logged on this day.')),
   ];
 }
+/** "4h 3m" as big figures with small unit letters. */
+const fig = (text) => String(text).split(/(\d+)/).filter(Boolean).map((t) => (/^\d+$/.test(t) || t === '—' ? t : /^\s+$/.test(t) ? ' ' : h('small', null, t.trim())));
 function eventIcon(e) {
   const [name, tint] = e.type === 'sleep' ? ['moon', 'sleep'] : e.type === 'spitup' ? ['spit', 'spit']
     : e.type === 'diaper' ? (e.kind === 'pee' ? ['drop', 'pee'] : ['diaper', 'poop'])
@@ -99,19 +110,19 @@ function nursingCard() {
     'aria-pressed': String(running && n.side === side),
     onclick: () => { state.nursing = L.nursingTap(state.nursing, side); save(); },
   }, h('b', null, label), h('span', { class: 'side-time' }, ''), h('small', null, running && n.side === side ? 'Tap to pause' : running ? 'Tap to switch' : 'Tap to resume'));
-  return h('section', { class: 'card nurse', 'aria-label': 'Breastfeeding timer' },
-    h('div', { class: 'nurse-head' }, h('span', null, running ? 'Feeding now' : 'Paused'), h('b', { id: 'nurse-clock', role: 'timer' }, '')),
+  return h('section', { class: 'card nurse' + (running ? ' running' : ''), 'aria-label': 'Breastfeeding timer' },
+    h('div', { class: 'nurse-head' }, h('span', null, running ? 'Feeding now' : 'Paused'),
+      h('button', { class: 'btn danger', type: 'button', onclick: () => { if (confirm('Discard this feed without logging it?')) { state.nursing = null; save(); } } }, 'Discard')),
+    h('b', { id: 'nurse-clock', role: 'timer' }, ''),
     h('div', { class: 'row2' }, sideBtn('left', 'Left'), sideBtn('right', 'Right')),
-    h('div', { class: 'actions' },
-      h('button', { class: 'btn danger', type: 'button', onclick: () => { if (confirm('Discard this feed without logging it?')) { state.nursing = null; save(); } } }, 'Discard'),
-      h('button', { class: 'btn primary', type: 'button', onclick: () => {
-        const ev = L.nursingToFeed(state.nursing);
-        // a timer left running for hours is almost always a forgotten one
-        if (ev.minutes > 90 && !confirm(`Log a feed of ${L.fmtDuration(ev.minutes * 60000)}? If the timer was left running, tap Cancel and use Discard, then enter the feed by hand.`)) return;
-        view.tapGuard = Date.now() + 700; // Spit-up moves under the finger when this card disappears
-        state.nursing = null; state.events.push(ev); showDay(ev.start); save();
-        toast(`Breastfeed logged: ${L.describeEvent(ev, units()).detail}`, 'Edit', () => editEvent(ev));
-      } }, '■ Stop and log')));
+    h('button', { class: 'btn primary block', type: 'button', onclick: () => {
+      const ev = L.nursingToFeed(state.nursing);
+      // a timer left running for hours is almost always a forgotten one
+      if (ev.minutes > 90 && !confirm(`Log a feed of ${L.fmtDuration(ev.minutes * 60000)}? If the timer was left running, tap Cancel and use Discard, then enter the feed by hand.`)) return;
+      view.tapGuard = Date.now() + 700; // Spit-up moves under the finger when this card disappears
+      state.nursing = null; state.events.push(ev); showDay(ev.start); save();
+      toast(`Breastfeed logged: ${L.describeEvent(ev, units()).detail}`, 'Edit', () => editEvent(ev));
+    } }, '■ Stop and log'));
 }
 export function tickNursing() {
   const clock = $('nurse-clock');
