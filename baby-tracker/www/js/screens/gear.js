@@ -46,7 +46,7 @@ export function viewGear() {
   return [
     h('section', { class: 'card' },
       h('div', { class: 'stats two' }, stat('To buy', toBuy.length, total ? `about ${money(total)}` : ''), stat('Bought', bought.length)),
-      h('button', { class: 'btn primary block', type: 'button', onclick: () => gearSheet() }, '+ Add gear')),
+      h('button', { class: 'btn tonal block', type: 'button', onclick: () => gearSheet() }, '+ Add gear')),
     h('section', { class: 'card' }, h('h2', null, 'To buy later'),
       toBuy.length ? h('ul', { class: 'list gear' }, toBuy.map(row)) : h('p', { class: 'empty' }, 'Your wishlist is empty. Add something, or pick from the ideas below.')),
     bought.length > 0 && h('section', { class: 'card' }, h('h2', null, 'Bought'), h('ul', { class: 'list gear' }, bought.map(row))),
